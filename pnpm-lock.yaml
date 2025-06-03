@@ -482,6 +482,9 @@ packages:
   '@vitest/pretty-format@3.1.4':
     resolution: {integrity: sha512-cqv9H9GvAEoTaoq+cYqUTCGscUjKqlJZC7PRwY5FMySVj5J+xOm1KQcCiYHJOEzOKRUhLH4R2pTwvFlWCEScsg==}
 
+  '@vitest/pretty-format@3.2.0':
+    resolution: {integrity: sha512-gUUhaUmPBHFkrqnOokmfMGRBMHhgpICud9nrz/xpNV3/4OXCn35oG+Pl8rYYsKaTNd/FAIrqRHnwpDpmYxCYZw==}
+
   '@vitest/runner@3.1.4':
     resolution: {integrity: sha512-djTeF1/vt985I/wpKVFBMWUlk/I7mb5hmD5oP8K9ACRmVXgKTae3TUOtXAEBfslNKPzUQvnKhNd34nnRSYgLNQ==}
 
@@ -1322,6 +1325,10 @@ snapshots:
     dependencies:
       tinyrainbow: 2.0.0
 
+  '@vitest/pretty-format@3.2.0':
+    dependencies:
+      tinyrainbow: 2.0.0
+
   '@vitest/runner@3.1.4':
     dependencies:
       '@vitest/utils': 3.1.4
@@ -1759,7 +1766,7 @@ snapshots:
     dependencies:
       '@vitest/expect': 3.1.4
       '@vitest/mocker': 3.1.4(msw@2.8.7(@types/node@22.15.29)(typescript@5.8.3))(vite@6.3.5(@types/node@22.15.29))
-      '@vitest/pretty-format': 3.1.4
+      '@vitest/pretty-format': 3.2.0
       '@vitest/runner': 3.1.4
       '@vitest/snapshot': 3.1.4
       '@vitest/spy': 3.1.4
