@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourceAdapter } from "../../src/stream-adapter";
+import { EventSourceProcessor } from "../../src/stream-adapter";
 
 class StubEventSource extends EventSource {
   constructor(private _readyState: number) {
@@ -25,7 +25,7 @@ describe("EventSourceAdapter", () => {
   describe("Message Handling", () => {
     it("should handle multiple messages", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onChunk(chunkCallback);
 
       adapter.start();
@@ -43,7 +43,7 @@ describe("EventSourceAdapter", () => {
   describe("Error Handling", () => {
     it("should call endCallback when EventSource is closed", () => {
       const stubEventSource = new StubEventSource(2); // EventSource.CLOSED
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
 
@@ -56,7 +56,7 @@ describe("EventSourceAdapter", () => {
 
     it("should call errorCallback when EventSource has error but not closed", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onError(errorCallback);
 
       adapter.start();
@@ -72,7 +72,7 @@ describe("EventSourceAdapter", () => {
 
     it("should call errorCallback when EventSource is connecting", () => {
       const stubEventSource = new StubEventSource(0); // EventSource.CONNECTING
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onError(errorCallback);
 
       adapter.start();
@@ -87,7 +87,7 @@ describe("EventSourceAdapter", () => {
 
     it("should handle error after successful messages", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onChunk(chunkCallback);
       adapter.onError(errorCallback);
 
@@ -105,7 +105,7 @@ describe("EventSourceAdapter", () => {
   describe("Stream Control", () => {
     it("should close EventSource when stop() is called", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
 
       adapter.start();
       adapter.stop();
@@ -115,7 +115,7 @@ describe("EventSourceAdapter", () => {
 
     it("should handle stop() before start()", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
 
       expect(() => adapter.stop()).not.toThrow();
       expect(stubEventSource.close).toHaveBeenCalled();
@@ -123,7 +123,7 @@ describe("EventSourceAdapter", () => {
 
     it("should handle multiple stop() calls", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -139,7 +139,7 @@ describe("EventSourceAdapter", () => {
   describe("Callback Registration", () => {
     it("should work without callbacks registered", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
 
       expect(() => adapter.start()).not.toThrow();
       expect(() =>
@@ -149,7 +149,7 @@ describe("EventSourceAdapter", () => {
 
     it("should allow callback changes between messages", () => {
       const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceAdapter(stubEventSource);
+      const adapter = new EventSourceProcessor(stubEventSource);
       adapter.onChunk(chunkCallback);
 
       adapter.start();

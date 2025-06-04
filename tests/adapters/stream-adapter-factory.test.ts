@@ -10,11 +10,11 @@ import {
   vi,
 } from "vitest";
 import {
-  AsyncIterableAdapter,
-  EventSourceAdapter,
-  ReadableStreamAdapter,
-  StreamAdapterFactory,
-  WebSocketAdapter,
+  AsyncIterableProcessor,
+  EventSourceProcessor,
+  ReadableStreamProcessor,
+  StreamProcessorFactory,
+  WebSocketProcessor,
 } from "../../src/stream-adapter";
 
 // Mock ReadableStream that extends the real class
@@ -75,26 +75,26 @@ describe("StreamAdapterFactory", () => {
 
   describe("should detect and return valid adapter interface for", () => {
     it("ReadableStream", () => {
-      const adapter = StreamAdapterFactory.create(new MockReadableStream());
+      const adapter = StreamProcessorFactory.create(new MockReadableStream());
 
-      expect(adapter).toBeInstanceOf(ReadableStreamAdapter);
+      expect(adapter).toBeInstanceOf(ReadableStreamProcessor);
     });
 
     it("EventSource", () => {
-      const adapter = StreamAdapterFactory.create(new MockEventSource());
+      const adapter = StreamProcessorFactory.create(new MockEventSource());
 
-      expect(adapter).toBeInstanceOf(EventSourceAdapter);
+      expect(adapter).toBeInstanceOf(EventSourceProcessor);
     });
 
     it("WebSocket", () => {
-      const adapter = StreamAdapterFactory.create(new MockWebSocket());
+      const adapter = StreamProcessorFactory.create(new MockWebSocket());
 
-      expect(adapter).toBeInstanceOf(WebSocketAdapter);
+      expect(adapter).toBeInstanceOf(WebSocketProcessor);
     });
 
     it("AsyncIterable", () => {
-      const adapter = StreamAdapterFactory.create(new MockAsyncIterable());
-      expect(adapter).toBeInstanceOf(AsyncIterableAdapter);
+      const adapter = StreamProcessorFactory.create(new MockAsyncIterable());
+      expect(adapter).toBeInstanceOf(AsyncIterableProcessor);
     });
 
     it("async generator", () => {
@@ -102,8 +102,8 @@ describe("StreamAdapterFactory", () => {
         yield "test";
       }
 
-      const adapter = StreamAdapterFactory.create(generator());
-      expect(adapter).toBeInstanceOf(AsyncIterableAdapter);
+      const adapter = StreamProcessorFactory.create(generator());
+      expect(adapter).toBeInstanceOf(AsyncIterableProcessor);
     });
   });
 
@@ -121,7 +121,7 @@ describe("StreamAdapterFactory", () => {
 
     for (const { input, name } of invalidInputs) {
       it(`${name}`, () => {
-        expect(() => StreamAdapterFactory.create(input as never)).toThrow();
+        expect(() => StreamProcessorFactory.create(input as never)).toThrow();
       });
     }
   });

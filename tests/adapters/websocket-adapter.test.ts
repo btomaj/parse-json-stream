@@ -1,6 +1,6 @@
 import { getResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WebSocketAdapter } from "../../src/stream-adapter";
+import { WebSocketProcessor } from "../../src/stream-adapter";
 
 class StubWebSocket extends WebSocket {
   public onmessage = vi.fn();
@@ -29,7 +29,7 @@ describe("WebSocketAdapter", () => {
   describe("Message Handling", () => {
     it("should handle multiple messages", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -48,7 +48,7 @@ describe("WebSocketAdapter", () => {
 
     it("should handle empty messages", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -64,7 +64,7 @@ describe("WebSocketAdapter", () => {
 
     it("should error on non-string data", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -81,7 +81,7 @@ describe("WebSocketAdapter", () => {
 
     it("should handle ArrayBuffer data", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onError(errorCallback);
 
@@ -101,7 +101,7 @@ describe("WebSocketAdapter", () => {
   describe("Connection Close Handling", () => {
     it("should call endCallback when WebSocket closes normally", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -116,7 +116,7 @@ describe("WebSocketAdapter", () => {
 
     it("should call endCallback when WebSocket closes with error code", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -130,7 +130,7 @@ describe("WebSocketAdapter", () => {
 
     it("should call endCallback after successful messages", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -148,7 +148,7 @@ describe("WebSocketAdapter", () => {
   describe("Error Handling", () => {
     it("should call errorCallback when WebSocket has error", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -168,7 +168,7 @@ describe("WebSocketAdapter", () => {
   describe("Stream Control", () => {
     it("should close WebSocket when stop() is called", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -181,7 +181,7 @@ describe("WebSocketAdapter", () => {
 
     it("should handle stop() before start()", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -192,7 +192,7 @@ describe("WebSocketAdapter", () => {
 
     it("should handle multiple stop() calls", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -208,7 +208,7 @@ describe("WebSocketAdapter", () => {
   describe("Callback Registration", () => {
     it("should work without callbacks registered", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
 
       expect(() => adapter.start()).not.toThrow();
       expect(() => stubWebSocket.onmessage({ data: "test" })).not.toThrow();
@@ -216,7 +216,7 @@ describe("WebSocketAdapter", () => {
 
     it("should allow callback changes between messages", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
-      const adapter = new WebSocketAdapter(stubWebSocket);
+      const adapter = new WebSocketProcessor(stubWebSocket);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);

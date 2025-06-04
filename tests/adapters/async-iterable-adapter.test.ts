@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AsyncIterableAdapter } from "../../src/stream-adapter";
+import { AsyncIterableProcessor } from "../../src/stream-adapter";
 
 describe("AsyncIterableAdapter", () => {
   const chunkCallback = vi.fn();
@@ -18,7 +18,7 @@ describe("AsyncIterableAdapter", () => {
         yield "third";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -37,7 +37,7 @@ describe("AsyncIterableAdapter", () => {
         // Empty generator
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -55,7 +55,7 @@ describe("AsyncIterableAdapter", () => {
         yield "delayed";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -76,7 +76,7 @@ describe("AsyncIterableAdapter", () => {
       }
 
       // @ts-ignore
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -102,7 +102,7 @@ describe("AsyncIterableAdapter", () => {
         yield '{"json": "string"}';
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -120,7 +120,7 @@ describe("AsyncIterableAdapter", () => {
       }
 
       // @ts-ignore
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -144,7 +144,7 @@ describe("AsyncIterableAdapter", () => {
       }
 
       // @ts-ignore
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -167,7 +167,7 @@ describe("AsyncIterableAdapter", () => {
       }
 
       // @ts-ignore
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -190,7 +190,7 @@ describe("AsyncIterableAdapter", () => {
         yield new Uint8Array([32, 87, 111, 114, 108, 100]); // " World"
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -216,7 +216,7 @@ describe("AsyncIterableAdapter", () => {
         yield buffer2;
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -236,7 +236,7 @@ describe("AsyncIterableAdapter", () => {
         yield "end";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -257,7 +257,7 @@ describe("AsyncIterableAdapter", () => {
         throw new Error("Iterator error");
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
@@ -282,7 +282,7 @@ describe("AsyncIterableAdapter", () => {
         );
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onError(errorCallback);
 
@@ -308,7 +308,7 @@ describe("AsyncIterableAdapter", () => {
         yield "second";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -328,7 +328,7 @@ describe("AsyncIterableAdapter", () => {
         yield "test";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
 
       expect(() => adapter.stop()).not.toThrow();
     });
@@ -338,7 +338,7 @@ describe("AsyncIterableAdapter", () => {
         yield "test";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.start();
 
       expect(() => {
@@ -354,7 +354,7 @@ describe("AsyncIterableAdapter", () => {
         yield "test";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
 
       expect(() => adapter.start()).not.toThrow();
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -376,7 +376,7 @@ describe("AsyncIterableAdapter", () => {
         yield "second";
       }
 
-      const adapter = new AsyncIterableAdapter(StubAsyncIterable());
+      const adapter = new AsyncIterableProcessor(StubAsyncIterable());
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 

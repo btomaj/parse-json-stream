@@ -1,4 +1,4 @@
-export interface StreamAdapter {
+export interface StreamProcessor {
   onChunk(callback: (chunk: string) => void): void;
   onEnd(callback: () => void): void;
   onError(callback: (error: Error) => void): void;
@@ -6,7 +6,7 @@ export interface StreamAdapter {
   stop(): void;
 }
 
-export class ReadableStreamAdapter implements StreamAdapter {
+export class ReadableStreamProcessor implements StreamProcessor {
   private reader: ReadableStreamDefaultReader<
     string | Uint8Array | ArrayBuffer
   >;
@@ -73,7 +73,7 @@ export class ReadableStreamAdapter implements StreamAdapter {
   }
 }
 
-export class EventSourceAdapter implements StreamAdapter {
+export class EventSourceProcessor implements StreamProcessor {
   private chunkCallback?: (chunk: string) => void;
   private endCallback?: () => void;
   private errorCallback?: (error: Error) => void;
@@ -113,7 +113,7 @@ export class EventSourceAdapter implements StreamAdapter {
   }
 }
 
-export class WebSocketAdapter implements StreamAdapter {
+export class WebSocketProcessor implements StreamProcessor {
   private chunkCallback?: (chunk: string) => void;
   private endCallback?: () => void;
   private errorCallback?: (error: Error) => void;
@@ -166,7 +166,7 @@ export class WebSocketAdapter implements StreamAdapter {
   }
 }
 
-export class AsyncIterableAdapter implements StreamAdapter {
+export class AsyncIterableProcessor implements StreamProcessor {
   private chunkCallback?: (chunk: string) => void;
   private endCallback?: () => void;
   private errorCallback?: (error: Error) => void;
@@ -231,23 +231,23 @@ export class AsyncIterableAdapter implements StreamAdapter {
 }
 
 // biome-ignore lint/complexity/noStaticOnlyClass:
-export class StreamAdapterFactory {
-  private static forReadableStream(stream: ReadableStream): StreamAdapter {
-    return new ReadableStreamAdapter(stream);
+export class StreamProcessorFactory {
+  private static forReadableStream(stream: ReadableStream): StreamProcessor {
+    return new ReadableStreamProcessor(stream);
   }
 
-  private static forEventSource(eventSource: EventSource): StreamAdapter {
-    return new EventSourceAdapter(eventSource);
+  private static forEventSource(eventSource: EventSource): StreamProcessor {
+    return new EventSourceProcessor(eventSource);
   }
 
-  private static forWebSocket(webSocket: WebSocket): StreamAdapter {
-    return new WebSocketAdapter(webSocket);
+  private static forWebSocket(webSocket: WebSocket): StreamProcessor {
+    return new WebSocketProcessor(webSocket);
   }
 
   private static forAsyncIterable(
     asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): StreamAdapter {
-    return new AsyncIterableAdapter(asyncIterable);
+  ): StreamProcessor {
+    return new AsyncIterableProcessor(asyncIterable);
   }
 
   static create(
@@ -256,25 +256,25 @@ export class StreamAdapterFactory {
       | EventSource
       | WebSocket
       | AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): StreamAdapter {
+  ): StreamProcessor {
     if (typeof stream === "undefined" || stream === null) {
       throw new Error("Stream is undefined or null");
     }
 
     if (stream instanceof ReadableStream) {
-      return StreamAdapterFactory.forReadableStream(stream);
+      return StreamProcessorFactory.forReadableStream(stream);
     }
 
     if (typeof EventSource !== "undefined" && stream instanceof EventSource) {
-      return StreamAdapterFactory.forEventSource(stream);
+      return StreamProcessorFactory.forEventSource(stream);
     }
 
     if (typeof WebSocket !== "undefined" && stream instanceof WebSocket) {
-      return StreamAdapterFactory.forWebSocket(stream);
+      return StreamProcessorFactory.forWebSocket(stream);
     }
 
     if (Symbol.asyncIterator in stream) {
-      return StreamAdapterFactory.forAsyncIterable(stream);
+      return StreamProcessorFactory.forAsyncIterable(stream);
     }
 
     throw new Error("Unsupported stream type");

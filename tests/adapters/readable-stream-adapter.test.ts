@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ReadableStreamAdapter } from "../../src/stream-adapter";
+import { ReadableStreamProcessor } from "../../src/stream-adapter";
 
 class MockReadableStream extends ReadableStream<string> {
   public mockReader = {
@@ -26,7 +26,7 @@ describe("ReadableStreamAdapter", () => {
   describe("String Chunks", () => {
     it("should handle multiple string chunks", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
 
@@ -50,7 +50,7 @@ describe("ReadableStreamAdapter", () => {
 
     it("should handle empty string chunks", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onChunk(chunkCallback);
       mockStream.mockReader.read.mockResolvedValueOnce({
         done: false,
@@ -73,7 +73,7 @@ describe("ReadableStreamAdapter", () => {
   describe("Error Handling", () => {
     it("should handle read errors", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onError(errorCallback);
       const error = new Error("Read failed");
       mockStream.mockReader.read.mockRejectedValueOnce(error);
@@ -86,7 +86,7 @@ describe("ReadableStreamAdapter", () => {
 
     it("should handle unsupported chunk types", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onError(errorCallback);
       mockStream.mockReader.read.mockResolvedValueOnce({
         done: false,
@@ -107,7 +107,7 @@ describe("ReadableStreamAdapter", () => {
   describe("Stream Control", () => {
     it("should stop and cancel reader when stop() is called", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       mockStream.mockReader.read.mockResolvedValue({
         done: false,
         value: "test",
@@ -121,7 +121,7 @@ describe("ReadableStreamAdapter", () => {
 
     it("should handle stop() before start()", () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
 
       expect(() => adapter.stop()).not.toThrow();
     });
@@ -130,7 +130,7 @@ describe("ReadableStreamAdapter", () => {
   describe("Callback Registration", () => {
     it("should work without callbacks registered", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       mockStream.mockReader.read.mockResolvedValueOnce({
         done: false,
         value: "test",
@@ -143,7 +143,7 @@ describe("ReadableStreamAdapter", () => {
 
     it("should allow callback changes between chunks", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onChunk(chunkCallback);
       const newChunkCallback = vi.fn();
       mockStream.mockReader.read
@@ -165,7 +165,7 @@ describe("ReadableStreamAdapter", () => {
   describe("Stream Completion", () => {
     it("should call endCallback after final chunk", async () => {
       const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamAdapter(mockStream);
+      const adapter = new ReadableStreamProcessor(mockStream);
       adapter.onChunk(chunkCallback);
       adapter.onEnd(endCallback);
       mockStream.mockReader.read.mockResolvedValueOnce({
