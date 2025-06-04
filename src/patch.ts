@@ -3,7 +3,11 @@ import { parseStream } from "./index";
 declare global {
   interface JSON {
     parseStream(
-      stream: ReadableStream | EventSource | WebSocket | AsyncIterable<string | Uint8Array | ArrayBuffer>,
+      stream:
+        | ReadableStream
+        | EventSource
+        | WebSocket
+        | AsyncIterable<string | Uint8Array | ArrayBuffer>,
     ): void;
   }
 }

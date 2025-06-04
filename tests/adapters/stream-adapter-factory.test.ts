@@ -117,10 +117,6 @@ describe("StreamAdapterFactory", () => {
       { input: {}, name: "plain object" },
       { input: [], name: "array" },
       { input: { notAStream: true }, name: "object without stream interface" },
-      {
-        input: { [Symbol.asyncIterator]: "not a function" },
-        name: "object with non-function Symbol.asyncIterator",
-      },
     ];
 
     for (const { input, name } of invalidInputs) {

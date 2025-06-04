@@ -173,7 +173,9 @@ export class AsyncIterableAdapter implements StreamAdapter {
   private abortController = new AbortController();
   private decoder = new TextDecoder();
 
-  constructor(private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>) {}
+  constructor(
+    private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
+  ) {}
 
   onChunk(callback: (chunk: string) => void): void {
     this.chunkCallback = callback;
@@ -249,26 +251,30 @@ export class StreamAdapterFactory {
   }
 
   static create(
-    stream: ReadableStream | EventSource | WebSocket | AsyncIterable<string | Uint8Array | ArrayBuffer>,
+    stream:
+      | ReadableStream
+      | EventSource
+      | WebSocket
+      | AsyncIterable<string | Uint8Array | ArrayBuffer>,
   ): StreamAdapter {
     if (typeof stream === "undefined" || stream === null) {
       throw new Error("Stream is undefined or null");
     }
 
     if (stream instanceof ReadableStream) {
-      return this.forReadableStream(stream);
+      return StreamAdapterFactory.forReadableStream(stream);
     }
 
     if (typeof EventSource !== "undefined" && stream instanceof EventSource) {
-      return this.forEventSource(stream);
+      return StreamAdapterFactory.forEventSource(stream);
     }
 
     if (typeof WebSocket !== "undefined" && stream instanceof WebSocket) {
-      return this.forWebSocket(stream);
+      return StreamAdapterFactory.forWebSocket(stream);
     }
 
-    if (typeof stream[Symbol.asyncIterator] === "function") {
-      return this.forAsyncIterable(stream);
+    if (Symbol.asyncIterator in stream) {
+      return StreamAdapterFactory.forAsyncIterable(stream);
     }
 
     throw new Error("Unsupported stream type");

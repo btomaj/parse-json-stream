@@ -296,8 +296,6 @@ describe("AsyncIterableAdapter", () => {
         }),
       );
     });
-
-
   });
 
   describe("Stream Control", () => {

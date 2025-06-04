@@ -1,19 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("Concatenated JSON Parsing", () => {
-  let parser: any;
-  let events: any[];
-
-  beforeEach(() => {
-    events = [];
-    // parser = new JsonStreamParser();
-    // parser.on('value', (chunk) => events.push({ type: 'value', data: chunk }));
-    // parser.on('openObject', () => events.push({ type: 'openObject' }));
-    // parser.on('closeObject', () => events.push({ type: 'closeObject' }));
-    // parser.on('openArray', () => events.push({ type: 'openArray' }));
-    // parser.on('closeArray', () => events.push({ type: 'closeArray' }));
-  });
-
   describe("Multiple Objects Chunks", () => {
     it('single chunk: {"a":1}{"b":2}', () => {
       // parser.write('{"a":1}{"b":2}');

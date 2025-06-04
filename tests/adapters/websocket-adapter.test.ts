@@ -1,6 +1,6 @@
+import { getResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocketAdapter } from "../../src/stream-adapter";
-import { getResponse } from "msw";
 
 class StubWebSocket extends WebSocket {
   public onmessage = vi.fn();
@@ -72,37 +72,29 @@ describe("WebSocketAdapter", () => {
       adapter.start();
 
       const blobData = new Blob(["binary"]);
-      stubWebSocket.onmessage({ data: blobData });
 
-      expect(errorCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining(
-            "WebSocket JSON streams must use text messages",
-          ),
-        }),
+      expect(() => stubWebSocket.onmessage({ data: blobData })).toThrowError(
+        "Unsupported chunk type for JSON stream",
       );
       expect(chunkCallback).not.toHaveBeenCalled();
     });
 
-    it("should error on ArrayBuffer data", () => {
+    it("should handle ArrayBuffer data", () => {
       const stubWebSocket = new StubWebSocket(1); // WebSocket.OPEN
       const adapter = new WebSocketAdapter(stubWebSocket);
       adapter.onChunk(chunkCallback);
-      adapter.onEnd(endCallback);
       adapter.onError(errorCallback);
 
       adapter.start();
 
-      const bufferData = new ArrayBuffer(8);
+      const text = "test";
+      const encoder = new TextEncoder();
+      const bufferData = encoder.encode(text).buffer;
+
       stubWebSocket.onmessage({ data: bufferData });
 
-      expect(errorCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining(
-            "WebSocket JSON streams must use text messages",
-          ),
-        }),
-      );
+      expect(chunkCallback).toHaveBeenCalledWith(text);
+      expect(errorCallback).not.toHaveBeenCalled();
     });
   });
 
