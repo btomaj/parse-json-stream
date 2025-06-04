@@ -13,10 +13,12 @@ describe("Number Parsing", () => {
   ];
 
   describe.for(numbers)("should parse %s", (number) => {
-    const splits = [];
+    const variants = [];
     for (let chunkSize = 0; chunkSize < number.length + 1; chunkSize++) {
       // split into two chunks based on chunk size
-      splits.push([number.slice(0, chunkSize), number.slice(chunkSize)]);
+      variants.push({
+        chunks: [number.slice(0, chunkSize), number.slice(chunkSize)],
+      });
       if (chunkSize === 0) {
         continue;
       }
@@ -29,10 +31,9 @@ describe("Number Parsing", () => {
       for (let i = 0; i < numberOfChunks; i += 1) {
         chunks.push(number.slice(i * chunkSize, (i + 1) * chunkSize));
       }
-      splits.push(chunks);
+      variants.push({ chunks });
     }
-    console.log(splits);
-    it.for(splits)("split into chunks #%#", (split) => {
+    it.for(variants)("split into $chunks", (variant) => {
       // parser.write(String(nuber));
     });
   });

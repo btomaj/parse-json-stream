@@ -15,11 +15,13 @@ describe("String Parsing", () => {
     "\\u0041",
   ];
 
-  describe.for(strings)("should parse %s", (string) => {
-    const splits = [];
+  describe.for(strings)("should parse '%s'", (string) => {
+    const variants = [];
     for (let chunkSize = 0; chunkSize < string.length + 1; chunkSize++) {
       // split into two chunks based on chunk size
-      splits.push([string.slice(0, chunkSize), string.slice(chunkSize)]);
+      variants.push({
+        chunks: [string.slice(0, chunkSize), string.slice(chunkSize)],
+      });
       if (chunkSize === 0) {
         continue;
       }
@@ -32,11 +34,10 @@ describe("String Parsing", () => {
       for (let i = 0; i < numberOfChunks; i += 1) {
         chunks.push(string.slice(i * chunkSize, (i + 1) * chunkSize));
       }
-      splits.push(chunks);
+      variants.push({ chunks });
     }
-    console.log(splits);
-    it.for(splits)("split into chunks #%#", (split) => {
-      // parser.write(String(nuber));
+    it.for(variants)("split into $chunks", (variant) => {
+      // parser.write(variant.chunk);
     });
   });
 });
