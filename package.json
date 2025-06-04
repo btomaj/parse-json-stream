@@ -2,8 +2,20 @@
   "name": "parse-json-stream",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./patch": {
+      "types": "./dist/patch.d.ts",
+      "default": "./dist/patch.js"
+    }
+  },
   "scripts": {
+    "build": "tsc",
     "test": "NODE_OPTIONS=--experimental-eventsource vitest run",
     "typecheck": "tsc --noEmit",
     "format": "biome check --write"
@@ -14,12 +26,10 @@
   "packageManager": "pnpm@10.11.0",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.15.29",
     "@vitest/coverage-v8": "3.1.4",
+    "msw": "^2.8.7",
     "typescript": "^5.8.3",
     "vitest": "^3.1.4"
-  },
-  "dependencies": {
-    "@types/node": "^22.15.29",
-    "msw": "^2.8.7"
   }
 }

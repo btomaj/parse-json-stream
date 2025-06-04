@@ -7,20 +7,19 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@types/node':
-        specifier: ^22.15.29
-        version: 22.15.29
-      msw:
-        specifier: ^2.8.7
-        version: 2.8.7(@types/node@22.15.29)(typescript@5.8.3)
     devDependencies:
       '@biomejs/biome':
         specifier: ^1.9.4
         version: 1.9.4
+      '@types/node':
+        specifier: ^22.15.29
+        version: 22.15.29
       '@vitest/coverage-v8':
         specifier: 3.1.4
         version: 3.1.4(vitest@3.1.4(@types/node@22.15.29)(msw@2.8.7(@types/node@22.15.29)(typescript@5.8.3)))
+      msw:
+        specifier: ^2.8.7
+        version: 2.8.7(@types/node@22.15.29)(typescript@5.8.3)
       typescript:
         specifier: ^5.8.3
         version: 5.8.3

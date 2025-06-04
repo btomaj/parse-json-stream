@@ -1,15 +1,5 @@
-declare global {
-  interface JSON {
-    parseStream(
-      stream: ReadableStream | EventSource | WebSocket | AsyncIterable,
-    ): void;
-  }
-}
-
-JSON.parseStream = (
-  stream: ReadableStream | EventSource | WebSocket | AsyncIterable,
-): void => {
+export function parseStream(
+  stream: ReadableStream | EventSource | WebSocket | AsyncIterable<string | Uint8Array | ArrayBuffer>,
+): void {
   throw new Error("parseStream not yet implemented");
-};
-
-export {};
+}
