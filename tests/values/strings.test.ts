@@ -2,17 +2,17 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 describe("String Parsing", () => {
   const strings = [
-    "Hello World",
-    "",
-    '\\"',
-    "\\\\",
-    "\\/",
-    "\\b",
-    "\\f",
-    "\\n",
-    "\\r",
-    "\\t",
-    "\\u0041",
+    '"Hello World"',
+    '""',
+    '"\\""',
+    '"\\\\"',
+    '"\\/"',
+    '"\\b"',
+    '"\\f"',
+    '"\\n"',
+    '"\\r"',
+    '"\\t"',
+    '"\\u0041"',
   ];
 
   describe.for(strings)("should parse '%s'", (string) => {
@@ -36,8 +36,15 @@ describe("String Parsing", () => {
       }
       variants.push({ chunks });
     }
+
+    const parser = new Parser();
     it.for(variants)("split into $chunks", (variant) => {
-      // parser.write(variant.chunk);
+      let string = "";
+      for (const chunk of variant.chunks) {
+        string += parser.processChunk(chunk);
+      }
+
+      expect(string).toBe(variant.chunks.join());
     });
   });
 });
