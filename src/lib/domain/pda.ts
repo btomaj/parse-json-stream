@@ -2,6 +2,8 @@
  * TODO
  * - [ ] Emit error event for unexpected Trigger, e.g. Trigger.Comma when waiting for a value inside an Value.Object
  */
+import { Trigger } from "./lexer";
+
 export enum Value {
   Object = "OBJECT",
   Array = "ARRAY",
@@ -10,22 +12,6 @@ export enum Value {
   True = "TRUE",
   False = "FALSE",
   Null = "NULL",
-}
-
-export enum Trigger {
-  ObjectOpen = "{",
-  ObjectClose = "}",
-  ArrayOpen = "[",
-  ArrayClose = "]",
-  Colon = ":",
-  Comma = ",",
-  String = '"',
-  Escape = "\\",
-  Number = "-0123456789",
-  True = "t",
-  False = "f",
-  Null = "n",
-  Whitespace = " \n\r\t",
 }
 
 class Transition {
@@ -873,30 +859,3 @@ new PDA([
   ...falseTransitions,
   ...nullTransitions,
 ]);
-
-export class ASCIICharacterMatcher {
-  private mask = new Uint8Array(128);
-
-  constructor(characters: { [key: string]: string } | ArrayLike<string>) {
-    // biome-ignore lint/complexity/noForEach: avoid unnecessary assignment
-    Object.values(characters)
-      .flatMap((value) => [...value])
-      .map((value) => value.charCodeAt(0))
-      .forEach((value) => {
-        if (value > 127) {
-          throw new Error("Non-ASCII character");
-        }
-        this.mask[value] = 1;
-      });
-  }
-
-  findIndexOfFirstMatch(string: string): number {
-    for (let i = 0; i < string.length; i++) {
-      const code = string.charCodeAt(i);
-      if (this.mask[code]) {
-        return i;
-      }
-    }
-    return -1;
-  }
-}
