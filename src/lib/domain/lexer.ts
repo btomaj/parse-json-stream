@@ -15,8 +15,13 @@ export abstract class Lexer<
   S extends string | number,
   C extends { toString(): string },
 > {
-  private readonly unicodeCharacterMask = new Uint8Array(128); // mask for ASCII characters
-  private readonly unicodeCharacterMap: Array<C> = []; // map of Unicode to classifications
+  // bit mask for ASCII token type symbols
+  private readonly unicodeCharacterBitMask:
+    | Uint8Array
+    | Uint16Array
+    | Uint32Array;
+  // map of token type symbols to classifications
+  private readonly unicodeCharacterMap: Array<C> = [];
   private readonly listeners: Array<
     (token: { type: S | C; lexeme: string }) => void
   > = [];
@@ -30,7 +35,7 @@ export abstract class Lexer<
     this.fsm = fsm;
 
     const stateBitFlags = this.createStateBitFlags(states);
-    const bitMask = this.createStateTokenTypeBitMask(
+    this.unicodeCharacterBitMask = this.createStateTokenTypeBitMask(
       stateBitFlags,
       stateTokenTypeMap,
     );
@@ -58,12 +63,12 @@ export abstract class Lexer<
     stateTokenTypeMaps: Array<StateTokenType<S, C>>,
   ): Uint8Array | Uint16Array | Uint32Array {
     let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
-    const statesCount = Object.keys(stateBitFlags).length;
-    if (statesCount <= 8) {
+    const numberOfStates = Object.keys(stateBitFlags).length;
+    if (numberOfStates <= 8) {
       tokenTypeBitmask = new Uint8Array(128);
-    } else if (statesCount <= 16) {
+    } else if (numberOfStates <= 16) {
       tokenTypeBitmask = new Uint16Array(128);
-    } else if (statesCount <= 32) {
+    } else if (numberOfStates <= 32) {
       tokenTypeBitmask = new Uint32Array(128);
     } else {
       throw new Error(
@@ -73,13 +78,14 @@ export abstract class Lexer<
 
     for (const stateTokenTypeMap of stateTokenTypeMaps) {
       const symbols = stateTokenTypeMap.inputSymbol.toString();
-      for (const character of symbols) {
-        const unicode = character.charCodeAt(0);
+      for (const symbol of symbols) {
+        const unicode = symbol.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
         tokenTypeBitmask[unicode] |=
           stateBitFlags[stateTokenTypeMap.currentState];
+        this.unicodeCharacterMap[unicode] = stateTokenTypeMap.inputSymbol;
       }
     }
 
@@ -89,7 +95,7 @@ export abstract class Lexer<
   protected findFirstTokenType(chunk: string): [number, C | null] {
     for (let i = 0; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
-      if (this.unicodeCharacterMask[code]) {
+      if (this.unicodeCharacterBitMask[code]) {
         return [i, this.unicodeCharacterMap[code]];
       }
     }
