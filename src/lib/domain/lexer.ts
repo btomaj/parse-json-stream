@@ -15,6 +15,7 @@ export abstract class Lexer<
   S extends string | number,
   C extends { toString(): string },
 > {
+  private readonly stateBitFlags: Record<S, number>;
   // bit mask for ASCII token type symbols
   private readonly unicodeCharacterBitMask:
     | Uint8Array
@@ -34,9 +35,9 @@ export abstract class Lexer<
   ) {
     this.fsm = fsm;
 
-    const stateBitFlags = this.createStateBitFlags(states);
+    this.stateBitFlags = this.createStateBitFlags(states);
     this.unicodeCharacterBitMask = this.createStateTokenTypeBitMask(
-      stateBitFlags,
+      this.stateBitFlags,
       stateTokenTypeMap,
     );
   }
@@ -93,9 +94,10 @@ export abstract class Lexer<
   }
 
   protected findFirstTokenType(chunk: string): [number, C | null] {
+    const stateBitFlags = this.stateBitFlags[this.fsm.state];
     for (let i = 0; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
-      if (this.unicodeCharacterBitMask[code]) {
+      if (this.unicodeCharacterBitMask[code] & stateBitFlags) {
         return [i, this.unicodeCharacterMap[code]];
       }
     }
