@@ -1,99 +1,122 @@
-import { isPath } from "msw/lib/core/utils/matching/matchRequestUrl";
+import type { FSM } from "./state";
+
+export class StateTokenType<S, I> {
+  constructor(
+    public readonly currentState: S,
+    public readonly inputSymbol: I,
+  ) {}
+}
 
 /**
  * TODO
  * - [ ] Determine what should be async in the lexeme
  */
-export enum Trigger {
-  ObjectOpen = "{",
-  ObjectClose = "}",
-  ArrayOpen = "[",
-  ArrayClose = "]",
-  Colon = ":",
-  Comma = ",",
-  String = '"',
-  Escape = "\\",
-  Number = "-0123456789",
-  True = "t",
-  False = "f",
-  Null = "n",
-  Whitespace = " \n\r\t",
-}
+export abstract class Lexer<
+  S extends string | number,
+  C extends { toString(): string },
+> {
+  private readonly unicodeCharacterMask = new Uint8Array(128); // mask for ASCII characters
+  private readonly unicodeCharacterMap: Array<C> = []; // map of Unicode to classifications
+  private readonly listeners: Array<
+    (token: { type: S | C; lexeme: string }) => void
+  > = [];
+  protected readonly fsm: FSM<S, C>;
 
-abstract class Lexer<T extends { [key: string]: string }> {
-  private mask = new Uint8Array(128); // mask for ASCII characters
-  private map: Array<T[keyof T]> = []; // map of Unicode to classifications
-  private listeners: Array<(chunk: string) => void> = [];
+  constructor(
+    states: Record<string, S>,
+    stateTokenTypeMap: Array<StateTokenType<S, C>>,
+    fsm: FSM<S, C>,
+  ) {
+    this.fsm = fsm;
 
-  constructor(classifications: T) {
-    for (const [category, characters] of Object.entries(classifications)) {
-      const lexemes = [...characters];
-      for (const lexeme of lexemes) {
-        const unicode = lexeme.charCodeAt(0);
+    const stateBitFlags = this.createStateBitFlags(states);
+    const bitMask = this.createStateTokenTypeBitMask(
+      stateBitFlags,
+      stateTokenTypeMap,
+    );
+  }
+
+  private createStateBitFlags(states: Record<string, S>): Record<S, number> {
+    const stateLabels = Object.values(states);
+    const stateBitFlags: Record<S, number> = {} as Record<S, number>;
+
+    if (stateLabels.length > 32) {
+      throw new Error(
+        "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
+      );
+    }
+
+    stateLabels.forEach((state, index) => {
+      stateBitFlags[state] = 1 << index;
+    });
+
+    return stateBitFlags;
+  }
+
+  private createStateTokenTypeBitMask(
+    stateBitFlags: Record<S, number>,
+    stateTokenTypeMaps: Array<StateTokenType<S, C>>,
+  ): Uint8Array | Uint16Array | Uint32Array {
+    let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
+    const statesCount = Object.keys(stateBitFlags).length;
+    if (statesCount <= 8) {
+      tokenTypeBitmask = new Uint8Array(128);
+    } else if (statesCount <= 16) {
+      tokenTypeBitmask = new Uint16Array(128);
+    } else if (statesCount <= 32) {
+      tokenTypeBitmask = new Uint32Array(128);
+    } else {
+      throw new Error(
+        "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
+      );
+    }
+
+    for (const stateTokenTypeMap of stateTokenTypeMaps) {
+      const symbols = stateTokenTypeMap.inputSymbol.toString();
+      for (const character of symbols) {
+        const unicode = character.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
-        this.mask[unicode] = 1;
-        this.map[unicode] = classifications[category as keyof T];
+        tokenTypeBitmask[unicode] |=
+          stateBitFlags[stateTokenTypeMap.currentState];
       }
     }
+
+    return tokenTypeBitmask;
   }
 
-  private findIndexOfFirstMatch(string: string): number {
-    for (let i = 0; i < string.length; i++) {
-      const code = string.charCodeAt(i);
-      if (this.mask[code]) {
-        return i;
+  protected findFirstTokenType(chunk: string): [number, C | null] {
+    for (let i = 0; i < chunk.length; i++) {
+      const code = chunk.charCodeAt(i);
+      if (this.unicodeCharacterMask[code]) {
+        return [i, this.unicodeCharacterMap[code]];
       }
     }
-    return -1;
+    return [-1, null];
   }
 
-  protected process(chunk: string): void {
-    const index = this.findIndexOfFirstMatch(chunk);
-    if (index < 0) {
-      this.emit(chunk);
-      return;
-    }
-    this.emit(chunk.slice(0, index)); // emit everything up to (not including) the lexeme
-    this.emit(this.map[chunk.charCodeAt(index)]); // emit the classification of the lexeme
-    if (index + 1 > chunk.length) {
-      this.process(chunk.slice(index + 1)); // process everything after (not including) the lexeme
-    }
-  }
+  /**
+   * Interprets a chunk, and emit lexemes if any.
+   * @param {string} chunk A chunk to interpret.
+   */
+  abstract process(chunk: string): void;
 
-  protected emit(chunk: string): void {
+  protected emit(token: {
+    type: S | C;
+    lexeme: string;
+  }): void {
     for (const listener of this.listeners) {
-      listener(chunk);
+      listener(token);
     }
   }
 
-  addListener(listener: (chunk: string) => void): void {
+  protected addListener(
+    listener: (token: {
+      type: S | C;
+      lexeme: string;
+    }) => void,
+  ): void {
     this.listeners.push(listener);
-  }
-}
-
-export class JSONLexer extends Lexer<typeof Trigger> {
-  private isEscaped = false;
-
-  constructor(
-    classifications: typeof Trigger,
-    private escapeCharacter: string = Trigger.Escape,
-  ) {
-    super(classifications);
-  }
-
-  protected emit(chunk: string): void {
-    // this if statement is first so that we emit "\\\\"
-    if (this.isEscaped) {
-      super.emit(this.escapeCharacter + chunk);
-      this.isEscaped = false;
-      return;
-    }
-    if (chunk === this.escapeCharacter) {
-      this.isEscaped = true;
-      return;
-    }
-    super.emit(chunk);
   }
 }
