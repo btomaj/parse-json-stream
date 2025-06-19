@@ -12,25 +12,25 @@ export class StateTokenType<S, I> {
  * - [ ] Determine what should be async in the lexeme
  */
 export abstract class Lexer<
-  S extends string | number,
-  C extends { toString(): string },
+  S extends Record<string, string | number>,
+  C extends Record<string, string | number | symbol>,
 > {
-  private readonly stateBitFlags: Record<S, number>;
+  private readonly stateBitFlags: Record<S[keyof S], number>;
   // bit mask for ASCII token type symbols
   private readonly unicodeCharacterBitMask:
     | Uint8Array
     | Uint16Array
     | Uint32Array;
   // map of token type symbols to classifications
-  private readonly unicodeCharacterMap: Array<C> = [];
+  private readonly unicodeCharacterMap: Array<C[keyof C]> = [];
   private readonly listeners: Array<
-    (token: { type: S | C; lexeme: string }) => void
+    (token: { type: S[keyof S] | C[keyof C]; lexeme: string }) => void
   > = [];
   protected readonly fsm: FSM<S, C>;
 
   constructor(
-    states: Record<string, S>,
-    stateTokenTypeMap: Array<StateTokenType<S, C>>,
+    states: S,
+    stateTokenTypeMap: Array<StateTokenType<S[keyof S], C[keyof C]>>,
     fsm: FSM<S, C>,
   ) {
     this.fsm = fsm;
@@ -42,9 +42,9 @@ export abstract class Lexer<
     );
   }
 
-  private createStateBitFlags(states: Record<string, S>): Record<S, number> {
-    const stateLabels = Object.values(states);
-    const stateBitFlags: Record<S, number> = {} as Record<S, number>;
+  private createStateBitFlags(states: S): Record<S[keyof S], number> {
+    const stateLabels = Object.values(states) as Array<S[keyof S]>;
+    const stateBitFlags = {} as Record<S[keyof S], number>;
 
     if (stateLabels.length > 32) {
       throw new Error(
@@ -60,8 +60,8 @@ export abstract class Lexer<
   }
 
   private createStateTokenTypeBitMask(
-    stateBitFlags: Record<S, number>,
-    stateTokenTypeMaps: Array<StateTokenType<S, C>>,
+    stateBitFlags: Record<S[keyof S], number>,
+    stateTokenTypeMaps: Array<StateTokenType<S[keyof S], C[keyof C]>>,
   ): Uint8Array | Uint16Array | Uint32Array {
     let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
     const numberOfStates = Object.keys(stateBitFlags).length;
@@ -93,7 +93,7 @@ export abstract class Lexer<
     return tokenTypeBitmask;
   }
 
-  protected findFirstTokenType(chunk: string): [number, C | null] {
+  protected findFirstTokenType(chunk: string): [number, C[keyof C] | null] {
     const stateBitFlags = this.stateBitFlags[this.fsm.state];
     for (let i = 0; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
@@ -111,7 +111,7 @@ export abstract class Lexer<
   abstract process(chunk: string): void;
 
   protected emit(token: {
-    type: S | C;
+    type: S[keyof S] | C[keyof C];
     lexeme: string;
   }): void {
     for (const listener of this.listeners) {
@@ -121,7 +121,7 @@ export abstract class Lexer<
 
   protected addListener(
     listener: (token: {
-      type: S | C;
+      type: S[keyof S] | C[keyof C];
       lexeme: string;
     }) => void,
   ): void {

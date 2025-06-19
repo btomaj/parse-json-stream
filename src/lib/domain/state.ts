@@ -11,10 +11,13 @@ export class FSMTransition<S, I> extends StateTokenType<S, I> {
 }
 
 export abstract class FSM<S, I> {
-  private _state: S;
-  private transitions: Map<S, Map<I, S>> = new Map();
+  private _state: S[keyof S];
+  private transitions: Map<S[keyof S], Map<I[keyof I], S[keyof S]>> = new Map();
 
-  constructor(transitions: Array<FSMTransition<S, I>>, initialState: S) {
+  constructor(
+    transitions: Array<FSMTransition<S[keyof S], I[keyof I]>>,
+    initialState: S[keyof S],
+  ) {
     for (const transition of transitions) {
       let stateTransitions = this.transitions.get(transition.currentState);
       if (!stateTransitions) {
@@ -27,11 +30,11 @@ export abstract class FSM<S, I> {
     this._state = initialState;
   }
 
-  get state(): S {
+  get state(): S[keyof S] {
     return this._state;
   }
 
-  transition(inputSymbol: I): void {
+  transition(inputSymbol: I[keyof I]): void {
     const transition = this.transitions.get(this.state);
     if (!transition) {
       throw new Error(`No transitions from ${this.state}`);
@@ -47,7 +50,7 @@ export abstract class FSM<S, I> {
     this._state = nextState;
   }
 
-  reset(state: S) {
+  reset(state: S[keyof S]) {
     this._state = state;
   }
 }
@@ -66,17 +69,19 @@ export class PDATransition<S, I> extends FSMTransition<S, I> {
 
 export abstract class PDA<S, I> {
   private readonly fsm: FSM<S, I>;
-  private readonly steps: Map<I, Map<S, Map<S, PDATransition<S, I>>>> =
-    new Map();
-  private readonly stack: Array<S> = [];
+  private readonly steps: Map<
+    I[keyof I],
+    Map<S[keyof S], Map<S[keyof S], PDATransition<S[keyof S], I[keyof I]>>>
+  > = new Map();
+  private readonly stack: Array<S[keyof S]> = [];
 
   constructor(
     FSM: new (
-      transitions: Array<FSMTransition<S, I>>,
-      initialState: S,
+      transitions: Array<FSMTransition<S[keyof S], I[keyof I]>>,
+      initialState: S[keyof S],
     ) => FSM<S, I>,
-    steps: Array<PDATransition<S, I>>,
-    initialState: S,
+    steps: Array<PDATransition<S[keyof S], I[keyof I]>>,
+    initialState: S[keyof S],
   ) {
     this.fsm = new FSM(steps, initialState);
 
@@ -103,11 +108,11 @@ export abstract class PDA<S, I> {
     this.stack.push(initialState);
   }
 
-  get state(): S {
+  get state(): S[keyof S] {
     return this.fsm.state;
   }
 
-  step(inputSymbol: I): void {
+  step(inputSymbol: I[keyof I]): void {
     const stackTop = this.stack.pop();
     if (!stackTop) {
       throw new Error(

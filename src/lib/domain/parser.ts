@@ -5,6 +5,9 @@
  */
 import type { Lexer } from "./lexer";
 
-export class Parser<S, C extends { toString(): string }> {
+export class Parser<
+  S extends Record<string, string | number>,
+  C extends Record<string, string | number | symbol>,
+> {
   constructor(private lexer: Lexer<S, C>) {}
 }
