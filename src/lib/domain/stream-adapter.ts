@@ -200,7 +200,9 @@ export class AsyncIterableProcessor implements StreamProcessor {
   private async consume(): Promise<void> {
     try {
       for await (const chunk of this.asyncIterable) {
-        if (this.abortController.signal.aborted) break;
+        if (this.abortController.signal.aborted) {
+          break;
+        }
 
         const decodedChunk = this.decodeChunk(chunk);
         this.chunkCallback?.(decodedChunk);

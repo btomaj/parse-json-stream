@@ -1,4 +1,4 @@
-import type { Parser } from "~/lib/domain/parser";
+import type { JSONParserUseCase } from "~/lib/application/parser";
 
 export interface JsonStreamHandler {
   onObjectStart(path: (string | number)[]): void;
@@ -11,7 +11,7 @@ export interface JsonStreamHandler {
 }
 
 export class ParseJSONStreamUseCase {
-  constructor(private parser: Parser) {}
+  constructor(private parser: JSONParserUseCase) {}
 
   processChunk(chunk: string): void {
     this.automaton.push(chunk);
