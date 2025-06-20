@@ -1,3 +1,4 @@
+import invariant from "tiny-invariant";
 import type { FSM } from "./state";
 
 export class StateTokenType<S, I> {
@@ -7,26 +8,31 @@ export class StateTokenType<S, I> {
   ) {}
 }
 
+interface LexerToken<S, C> {
+  type: S[keyof S] | C[keyof C];
+  lexeme: string;
+}
+
 /**
  * TODO
  * - [ ] Determine what should be async in the lexeme
  */
 export abstract class Lexer<
   S extends Record<string, string | number>,
-  C extends Record<string, string | number | symbol>,
+  C extends Record<string, string | symbol>,
 > {
   private readonly stateBitFlags: Record<S[keyof S], number>;
-  // bit mask for ASCII token type symbols
+  // bit mask for ASCII lexical rules
   private readonly unicodeCharacterBitMask:
     | Uint8Array
     | Uint16Array
     | Uint32Array;
-  // map of token type symbols to classifications
+  // map of lexical rules to token types
   private readonly unicodeCharacterMap: Array<C[keyof C]> = [];
   private readonly listeners: Array<
     (token: { type: S[keyof S] | C[keyof C]; lexeme: string }) => void
   > = [];
-  protected readonly fsm: FSM<S, C>;
+  private readonly fsm: FSM<S, C>;
 
   constructor(
     states: S,
@@ -78,9 +84,20 @@ export abstract class Lexer<
     }
 
     for (const stateTokenTypeMap of stateTokenTypeMaps) {
-      const symbols = stateTokenTypeMap.inputSymbol.toString();
-      for (const symbol of symbols) {
-        const unicode = symbol.charCodeAt(0);
+      const lexicalRule = stateTokenTypeMap.inputSymbol;
+      let characters: string;
+      if (typeof lexicalRule === "symbol") {
+        if (typeof lexicalRule.description === "undefined") {
+          throw new Error(
+            "Symbol.description cannot be undefined when Symbol is used for StateTokenType.inputSymbol",
+          );
+        }
+        characters = lexicalRule.description;
+      } else {
+        characters = lexicalRule.toString();
+      }
+      for (const character of characters) {
+        const unicode = character.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
@@ -93,38 +110,64 @@ export abstract class Lexer<
     return tokenTypeBitmask;
   }
 
-  protected findFirstTokenType(chunk: string): [number, C[keyof C] | null] {
-    const stateBitFlags = this.stateBitFlags[this.fsm.state];
+  private findFirstTokenTypeForState(
+    chunk: string,
+  ): [number, C[keyof C] | null] {
     for (let i = 0; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
-      if (this.unicodeCharacterBitMask[code] & stateBitFlags) {
+      if (
+        // bitwise AND
+        this.unicodeCharacterBitMask[code] & this.stateBitFlags[this.fsm.state]
+      ) {
         return [i, this.unicodeCharacterMap[code]];
       }
     }
     return [-1, null];
   }
 
+  protected *yieldToken(chunk: string): Generator<LexerToken<S, C>> {
+    while (chunk.length > 0) {
+      const [index, tokenType] = this.findFirstTokenTypeForState(chunk);
+      // if there is no lexeme in the chunk, emit the chunk
+      if (index < 0) {
+        yield { type: this.fsm.state, lexeme: chunk };
+        return;
+      }
+      // else there is a lexeme in the chunk
+      invariant(
+        tokenType,
+        "findFirstTokenType found token, but type property of token is null",
+      );
+      // if the lexeme is not the first character in the chunk, emit everything up to (not including) the lexeme
+      if (index > 0) {
+        yield { type: this.fsm.state, lexeme: chunk.slice(0, index) };
+      }
+
+      this.fsm.transition(tokenType);
+      yield { type: tokenType, lexeme: chunk.slice(index, index + 1) };
+
+      // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
+      // biome-ignore lint/style/noParameterAssign:
+      chunk = chunk.slice(index + 1);
+    }
+  }
+
   /**
    * Interprets a chunk, and emit lexemes if any.
+   *
+   * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk, and
+   * emit the tokens using `this.emit(token)`.
    * @param {string} chunk A chunk to interpret.
    */
   abstract process(chunk: string): void;
 
-  protected emit(token: {
-    type: S[keyof S] | C[keyof C];
-    lexeme: string;
-  }): void {
+  protected emit(token: LexerToken<S, C>): void {
     for (const listener of this.listeners) {
       listener(token);
     }
   }
 
-  protected addListener(
-    listener: (token: {
-      type: S[keyof S] | C[keyof C];
-      lexeme: string;
-    }) => void,
-  ): void {
+  protected addListener(listener: (token: LexerToken<S, C>) => void): void {
     this.listeners.push(listener);
   }
 }
