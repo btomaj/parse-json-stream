@@ -12,7 +12,10 @@ export class FSMTransition<S, I> extends StateTokenType<S, I> {
 
 export abstract class FSM<S, I> {
   private _state: S[keyof S];
-  private transitions: Map<S[keyof S], Map<I[keyof I], S[keyof S]>> = new Map();
+  protected transitions: Map<
+    S[keyof S],
+    Map<I[keyof I], FSMTransition<S[keyof S], I[keyof I]>>
+  > = new Map();
 
   constructor(
     transitions: Array<FSMTransition<S[keyof S], I[keyof I]>>,
@@ -24,7 +27,7 @@ export abstract class FSM<S, I> {
         stateTransitions = new Map();
         this.transitions.set(transition.currentState, stateTransitions);
       }
-      stateTransitions.set(transition.inputSymbol, transition.nextState);
+      stateTransitions.set(transition.inputSymbol, transition);
     }
 
     this._state = initialState;
@@ -34,20 +37,15 @@ export abstract class FSM<S, I> {
     return this._state;
   }
 
-  transition(inputSymbol: I[keyof I]): void {
-    const transition = this.transitions.get(this.state);
+  transition(inputSymbol: I[keyof I]): FSMTransition<S[keyof S], I[keyof I]> {
+    const transition = this.transitions.get(this.state)?.get(inputSymbol);
     if (!transition) {
-      throw new Error(`No transitions from ${this.state}`);
-    }
-
-    const nextState = transition.get(inputSymbol);
-    if (!nextState) {
       throw new Error(
         `No transition from state ${this.state} on ${inputSymbol}`,
       );
     }
-
-    this._state = nextState;
+    this._state = transition.nextState;
+    return transition;
   }
 
   reset(state: S[keyof S]) {
@@ -112,7 +110,7 @@ export abstract class PDA<S, I> {
     return this.fsm.state;
   }
 
-  step(inputSymbol: I[keyof I]): void {
+  step(inputSymbol: I[keyof I]): PDATransition<S[keyof S], I[keyof I]> {
     const stackTop = this.stack.pop();
     if (!stackTop) {
       throw new Error(
@@ -132,5 +130,7 @@ export abstract class PDA<S, I> {
 
     this.fsm.transition(inputSymbol);
     this.stack.push(...transition.stackPush);
+
+    return transition;
   }
 }
