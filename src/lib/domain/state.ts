@@ -10,7 +10,10 @@ export class FSMTransition<S, I> extends StateTokenType<S, I> {
   }
 }
 
-export abstract class FSM<S, I> {
+export abstract class FSM<
+  S extends Record<string, string | number>,
+  I extends Record<string, string | symbol>,
+> {
   private _state: S[keyof S];
   protected transitions: Map<
     S[keyof S],
@@ -41,7 +44,7 @@ export abstract class FSM<S, I> {
     const transition = this.transitions.get(this.state)?.get(inputSymbol);
     if (!transition) {
       throw new Error(
-        `No transition from state ${this.state} on ${inputSymbol}`,
+        `No transition from state ${this.state} on ${inputSymbol.toString()}`,
       );
     }
     this._state = transition.nextState;
@@ -65,70 +68,66 @@ export class PDATransition<S, I> extends FSMTransition<S, I> {
   }
 }
 
-export abstract class PDA<S, I> {
-  private readonly fsm: FSM<S, I>;
-  private readonly steps: Map<
-    I[keyof I],
-    Map<S[keyof S], Map<S[keyof S], PDATransition<S[keyof S], I[keyof I]>>>
+export abstract class DPDA<
+  S extends Record<string, string | number>,
+  I extends Record<string, string | symbol>,
+> {
+  private _state: S[keyof S];
+  private readonly transitions: Map<
+    S[keyof S],
+    Map<I[keyof I], Map<S[keyof S], PDATransition<S[keyof S], I[keyof I]>>>
   > = new Map();
   private readonly stack: Array<S[keyof S]> = [];
 
   constructor(
-    FSM: new (
-      transitions: Array<FSMTransition<S[keyof S], I[keyof I]>>,
-      initialState: S[keyof S],
-    ) => FSM<S, I>,
-    steps: Array<PDATransition<S[keyof S], I[keyof I]>>,
+    transitions: Array<PDATransition<S[keyof S], I[keyof I]>>,
     initialState: S[keyof S],
   ) {
-    this.fsm = new FSM(steps, initialState);
+    this._state = initialState;
 
-    for (const step of steps) {
-      if (step.stackPush.length === 0) {
-        throw new Error("Stack push cannot be empty");
+    for (const transition of transitions) {
+      let stateTransitions = this.transitions.get(transition.currentState);
+      if (!stateTransitions) {
+        stateTransitions = new Map();
+        this.transitions.set(transition.currentState, stateTransitions);
       }
 
-      let stateSteps = this.steps.get(step.inputSymbol);
-      if (!stateSteps) {
-        stateSteps = new Map();
-        this.steps.set(step.inputSymbol, stateSteps);
+      let stackTransitions = stateTransitions.get(transition.inputSymbol);
+      if (!stackTransitions) {
+        stackTransitions = new Map();
+        stateTransitions.set(transition.inputSymbol, stackTransitions);
       }
 
-      let stackSteps = stateSteps.get(step.currentState);
-      if (!stackSteps) {
-        stackSteps = new Map();
-        stateSteps.set(step.currentState, stackSteps);
-      }
-
-      stackSteps.set(step.stackTop, step);
+      stackTransitions.set(transition.stackTop, transition);
     }
 
     this.stack.push(initialState);
   }
 
   get state(): S[keyof S] {
-    return this.fsm.state;
+    return this._state;
   }
 
-  step(inputSymbol: I[keyof I]): PDATransition<S[keyof S], I[keyof I]> {
+  transition(inputSymbol: I[keyof I]): PDATransition<S[keyof S], I[keyof I]> {
     const stackTop = this.stack.pop();
-    if (!stackTop) {
+    if (typeof stackTop === "undefined") {
       throw new Error(
-        `State stack is empty on transition from currentState: ${this.state} with inputSymbol: ${inputSymbol}`,
+        `State stack is empty on transition from currentState: ${this.state} with inputSymbol: ${inputSymbol.toString()}`,
       );
     }
 
-    const transition = this.steps
-      .get(inputSymbol)
-      ?.get(this.state)
+    const transition = this.transitions
+      .get(this.state)
+      ?.get(inputSymbol)
       ?.get(stackTop);
     if (!transition) {
+      this.stack.push(stackTop);
       throw new Error(
-        `No transition for currentState: ${this.state}, inputSymbol: ${inputSymbol}, stackTop: ${stackTop}`,
+        `No transition for currentState: ${this.state}, inputSymbol: ${inputSymbol.toString()}, stackTop: ${stackTop}`,
       );
     }
 
-    this.fsm.transition(inputSymbol);
+    this._state = transition.nextState;
     this.stack.push(...transition.stackPush);
 
     return transition;

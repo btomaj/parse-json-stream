@@ -4,7 +4,7 @@
  * metadata. E.g. ["key", 0, "key"], and "string...".
  */
 import type { Lexer } from "~/lib/domain/lexer";
-import type { PDA } from "~/lib/domain/state";
+import type { DPDA } from "~/lib/domain/state";
 
 export class JSONParserUseCase<
   S extends Record<string, string | number>,
@@ -12,6 +12,6 @@ export class JSONParserUseCase<
 > {
   constructor(
     private lexer: Lexer<S, C>,
-    private pda: PDA<S, C>,
+    private pda: DPDA<S, C>,
   ) {}
 }
