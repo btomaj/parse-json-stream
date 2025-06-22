@@ -56,7 +56,7 @@ export abstract class FSM<
   }
 }
 
-export class PDATransition<S, I> extends FSMTransition<S, I> {
+export class DPDATransition<S, I> extends FSMTransition<S, I> {
   constructor(
     currentState: S,
     inputSymbol: I,
@@ -75,12 +75,12 @@ export abstract class DPDA<
   private _state: S[keyof S];
   private readonly transitions: Map<
     S[keyof S],
-    Map<I[keyof I], Map<S[keyof S], PDATransition<S[keyof S], I[keyof I]>>>
+    Map<I[keyof I], Map<S[keyof S], DPDATransition<S[keyof S], I[keyof I]>>>
   > = new Map();
   private readonly stack: Array<S[keyof S]> = [];
 
   constructor(
-    transitions: Array<PDATransition<S[keyof S], I[keyof I]>>,
+    transitions: Array<DPDATransition<S[keyof S], I[keyof I]>>,
     initialState: S[keyof S],
   ) {
     this._state = initialState;
@@ -108,7 +108,7 @@ export abstract class DPDA<
     return this._state;
   }
 
-  transition(inputSymbol: I[keyof I]): PDATransition<S[keyof S], I[keyof I]> {
+  transition(inputSymbol: I[keyof I]): DPDATransition<S[keyof S], I[keyof I]> {
     const stackTop = this.stack.pop();
     if (typeof stackTop === "undefined") {
       throw new Error(

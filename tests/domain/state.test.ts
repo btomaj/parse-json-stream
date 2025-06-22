@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DPDA, FSM, FSMTransition, PDATransition } from "~/lib/domain/state";
+import { DPDA, DPDATransition, FSM, FSMTransition } from "~/lib/domain/state";
 
 describe("FSM", () => {
   enum TestState {
@@ -88,7 +88,7 @@ describe("DPDA", () => {
 
   const testTransitions = [
     // From bottom marker: push open paren marker on open paren
-    new PDATransition(
+    new DPDATransition(
       TestState.Initial,
       TestInputSymbol.Open,
       TestState.Initial,
@@ -96,7 +96,7 @@ describe("DPDA", () => {
       [TestState.Initial, TestState.Matching],
     ),
     // From open paren marker: push another open paren marker on open paren
-    new PDATransition(
+    new DPDATransition(
       TestState.Initial,
       TestInputSymbol.Open,
       TestState.Matching,
@@ -104,7 +104,7 @@ describe("DPDA", () => {
       [TestState.Matching, TestState.Matching],
     ),
     // From open paren marker: consume it on close paren (reveal what's underneath)
-    new PDATransition(
+    new DPDATransition(
       TestState.Initial,
       TestInputSymbol.Close,
       TestState.Matching,
@@ -112,7 +112,7 @@ describe("DPDA", () => {
       [], // Pop OpenParen, push nothing - effectively consuming it
     ),
     // Accept when we see end symbol and only bottom marker on stack
-    new PDATransition(
+    new DPDATransition(
       TestState.Initial,
       TestInputSymbol.End,
       TestState.Initial,
@@ -156,7 +156,7 @@ describe("DPDA", () => {
   it("should throw error when stack is empty", () => {
     // Arrange
     const emptyStackTransitions = [
-      new PDATransition(
+      new DPDATransition(
         TestState.Initial,
         TestInputSymbol.Open,
         TestState.Initial,
