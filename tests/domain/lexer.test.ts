@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Lexer, StateTokenType } from "~/lib/domain/lexer";
+import { Lexer, type LexerToken } from "~/lib/domain/lexer";
 import { FSM, FSMTransition } from "~/lib/domain/state";
 
 describe("Abstract Lexer", () => {
@@ -58,7 +58,9 @@ describe("Abstract Lexer", () => {
       super(states, transitions, testFSM);
     }
 
-    public process(): void {}
+    public async *tokenise(): AsyncGenerator<
+      LexerToken<typeof TestState, typeof TestTokenType>
+    > {}
 
     // Expose protected methods for testing
     public testYieldToken(chunk: string) {

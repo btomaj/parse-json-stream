@@ -8,7 +8,7 @@ export class StateTokenType<S, I> {
   ) {}
 }
 
-interface LexerToken<S, C> {
+export interface LexerToken<S, C> {
   type: S[keyof S] | C[keyof C];
   lexeme: string;
 }
@@ -29,9 +29,6 @@ export abstract class Lexer<
     | Uint32Array;
   // map of lexical rules to token types
   private readonly unicodeCharacterMap: Array<C[keyof C]> = [];
-  private readonly listeners: Array<
-    (token: { type: S[keyof S] | C[keyof C]; lexeme: string }) => void
-  > = [];
   private readonly fsm: FSM<S, C>;
 
   constructor(
@@ -153,21 +150,10 @@ export abstract class Lexer<
   }
 
   /**
-   * Interprets a chunk, and emit lexemes if any.
+   * Interprets a chunk, yields LexerTokens
    *
-   * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk, and
-   * emit the tokens using `this.emit(token)`.
+   * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk.
    * @param {string} chunk A chunk to interpret.
    */
-  abstract process(chunk: string): void;
-
-  protected emit(token: LexerToken<S, C>): void {
-    for (const listener of this.listeners) {
-      listener(token);
-    }
-  }
-
-  protected addListener(listener: (token: LexerToken<S, C>) => void): void {
-    this.listeners.push(listener);
-  }
+  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<S, C>>;
 }
