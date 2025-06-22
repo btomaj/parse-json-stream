@@ -108,6 +108,10 @@ export abstract class DPDA<
     return this._state;
   }
 
+  get stackDepth(): number {
+    return this.stack.length;
+  }
+
   transition(inputSymbol: I[keyof I]): DPDATransition<S[keyof S], I[keyof I]> {
     const stackTop = this.stack.pop();
     if (typeof stackTop === "undefined") {
