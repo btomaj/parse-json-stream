@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourceProcessor } from "../../src/stream-adapter";
+import { EventSourceProcessor } from "~/lib/domain/stream-adapter";
 
 class StubEventSource extends EventSource {
   constructor(private _readyState: number) {

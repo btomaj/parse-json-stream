@@ -1,6 +1,6 @@
 import { getResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WebSocketProcessor } from "../../src/stream-adapter";
+import { WebSocketProcessor } from "~/lib/domain/stream-adapter";
 
 class StubWebSocket extends WebSocket {
   public onmessage = vi.fn();

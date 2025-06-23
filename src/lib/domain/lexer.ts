@@ -1,15 +1,15 @@
 import invariant from "tiny-invariant";
 import type { FSM } from "./state";
 
-export class StateTokenType<S, I> {
+export class StateTokenType<State, Input> {
   constructor(
-    public readonly currentState: S,
-    public readonly inputSymbol: I,
+    public readonly currentState: State,
+    public readonly inputSymbol: Input,
   ) {}
 }
 
-export interface LexerToken<S, C> {
-  type: S[keyof S] | C[keyof C];
+export interface LexerToken<TokenType> {
+  type: TokenType[keyof TokenType];
   lexeme: string;
 }
 
@@ -18,23 +18,25 @@ export interface LexerToken<S, C> {
  * - [ ] Determine what should be async in the lexeme
  */
 export abstract class Lexer<
-  S extends Record<string, string | number>,
-  C extends Record<string, string | symbol>,
+  State extends Record<string, string | number | symbol>,
+  Input extends Record<string, string | symbol>,
 > {
-  private readonly stateBitFlags: Record<S[keyof S], number>;
+  private readonly stateBitFlags: Record<State[keyof State], number>;
   // bit mask for ASCII lexical rules
   private readonly unicodeCharacterBitMask:
     | Uint8Array
     | Uint16Array
     | Uint32Array;
   // map of lexical rules to token types
-  private readonly unicodeCharacterMap: Array<C[keyof C]> = [];
-  private readonly fsm: FSM<S, C>;
+  private readonly unicodeCharacterMap: Array<Input[keyof Input]> = [];
+  private readonly fsm: FSM<State, Input>;
 
   constructor(
-    states: S,
-    stateTokenTypeMap: Array<StateTokenType<S[keyof S], C[keyof C]>>,
-    fsm: FSM<S, C>,
+    states: State,
+    stateTokenTypeMap: Array<
+      StateTokenType<State[keyof State], Input[keyof Input]>
+    >,
+    fsm: FSM<State, Input>,
   ) {
     this.fsm = fsm;
 
@@ -45,9 +47,11 @@ export abstract class Lexer<
     );
   }
 
-  private createStateBitFlags(states: S): Record<S[keyof S], number> {
-    const stateLabels = Object.values(states) as Array<S[keyof S]>;
-    const stateBitFlags = {} as Record<S[keyof S], number>;
+  private createStateBitFlags(
+    states: State,
+  ): Record<State[keyof State], number> {
+    const stateLabels = Object.values(states) as Array<State[keyof State]>;
+    const stateBitFlags = {} as Record<State[keyof State], number>;
 
     if (stateLabels.length > 32) {
       throw new Error(
@@ -63,8 +67,10 @@ export abstract class Lexer<
   }
 
   private createStateTokenTypeBitMask(
-    stateBitFlags: Record<S[keyof S], number>,
-    stateTokenTypeMaps: Array<StateTokenType<S[keyof S], C[keyof C]>>,
+    stateBitFlags: Record<State[keyof State], number>,
+    stateTokenTypeMaps: Array<
+      StateTokenType<State[keyof State], Input[keyof Input]>
+    >,
   ): Uint8Array | Uint16Array | Uint32Array {
     let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
     const numberOfStates = Object.keys(stateBitFlags).length;
@@ -109,7 +115,7 @@ export abstract class Lexer<
 
   private findFirstTokenTypeForState(
     chunk: string,
-  ): [number, C[keyof C] | null] {
+  ): [number, Input[keyof Input] | null] {
     for (let i = 0; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
       if (
@@ -122,7 +128,7 @@ export abstract class Lexer<
     return [-1, null];
   }
 
-  protected *yieldToken(chunk: string): Generator<LexerToken<S, C>> {
+  protected *yieldToken(chunk: string): Generator<LexerToken<State>> {
     while (chunk.length > 0) {
       const [index, tokenType] = this.findFirstTokenTypeForState(chunk);
       // if there is no lexeme in the chunk, emit the chunk
@@ -141,7 +147,7 @@ export abstract class Lexer<
       }
 
       this.fsm.transition(tokenType);
-      yield { type: tokenType, lexeme: chunk.slice(index, index + 1) };
+      yield { type: this.fsm.state, lexeme: chunk.slice(index, index + 1) };
 
       // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
       // biome-ignore lint/style/noParameterAssign:
@@ -155,5 +161,5 @@ export abstract class Lexer<
    * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk.
    * @param {string} chunk A chunk to interpret.
    */
-  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<S, C>>;
+  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<State>>;
 }

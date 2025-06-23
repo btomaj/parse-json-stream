@@ -58,29 +58,11 @@ describe("Abstract Lexer", () => {
       super(states, transitions, testFSM);
     }
 
-    public async *tokenise(): AsyncGenerator<
-      LexerToken<typeof TestState, typeof TestTokenType>
-    > {}
+    public async *tokenise(): AsyncGenerator<LexerToken<typeof TestState>> {}
 
     // Expose protected methods for testing
     public testYieldToken(chunk: string) {
       return Array.from(this.yieldToken(chunk));
-    }
-
-    public testEmit(token: {
-      type: TestState | (typeof TestTokenType)[keyof typeof TestTokenType];
-      lexeme: string;
-    }): void {
-      this.emit(token);
-    }
-
-    public testAddListener(
-      listener: (token: {
-        type: TestState | (typeof TestTokenType)[keyof typeof TestTokenType];
-        lexeme: string;
-      }) => void,
-    ): void {
-      this.addListener(listener);
     }
   }
 
@@ -140,11 +122,11 @@ describe("Abstract Lexer", () => {
     // Assert
     expect(tokens[0].type).toBe(TestState.Initial);
     expect(tokens[0].lexeme).toBe("abc");
-    expect(tokens[1].type).toBe(TestTokenType.Numbers);
+    expect(tokens[1].type).toBe(TestState.Numbers);
     expect(tokens[1].lexeme).toBe("1");
     expect(tokens[2].type).toBe(TestState.Numbers);
     expect(tokens[2].lexeme).toBe("23");
-    expect(tokens[3].type).toBe(TestTokenType.Special);
+    expect(tokens[3].type).toBe(TestState.Special);
     expect(tokens[3].lexeme).toBe("!");
     expect(tokens[4].type).toBe(TestState.Special);
     expect(tokens[4].lexeme).toBe("@#");
@@ -194,38 +176,5 @@ describe("Abstract Lexer", () => {
 
     // Assert
     expect(testFSM.state).toBe(TestState.Special);
-  });
-
-  it("should handle empty listener array", () => {
-    // Arrange
-    const lexer = new TestLexer();
-    const testToken = { type: TestState.Initial, lexeme: "test" };
-
-    // Act & Assert
-    expect(() => lexer.testEmit(testToken)).not.toThrow();
-  });
-
-  it("should emit to all listeners in order", () => {
-    // Arrange
-    const lexer = new TestLexer();
-    const order: number[] = [];
-    const listener1 = vi.fn(() => order.push(1));
-    const listener2 = vi.fn(() => order.push(2));
-    const listener3 = vi.fn(() => order.push(3));
-
-    lexer.testAddListener(listener1);
-    lexer.testAddListener(listener2);
-    lexer.testAddListener(listener3);
-
-    const testToken = { type: TestState.Initial, lexeme: "test" };
-
-    // Act
-    lexer.testEmit(testToken);
-
-    // Assert
-    expect(order).toEqual([1, 2, 3]);
-    expect(listener1).toHaveBeenCalledWith(testToken);
-    expect(listener2).toHaveBeenCalledWith(testToken);
-    expect(listener3).toHaveBeenCalledWith(testToken);
   });
 });

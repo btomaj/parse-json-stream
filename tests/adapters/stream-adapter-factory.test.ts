@@ -15,7 +15,7 @@ import {
   ReadableStreamProcessor,
   StreamProcessorFactory,
   WebSocketProcessor,
-} from "../../src/stream-adapter";
+} from "~/lib/domain/stream-adapter";
 
 // Mock ReadableStream that extends the real class
 class MockReadableStream extends ReadableStream<string> {

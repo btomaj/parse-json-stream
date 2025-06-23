@@ -55,7 +55,7 @@ export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
 class JSONChunk {
   constructor(
     private _value: string,
-    private _type: typeof JSONValue | typeof JSONTokenType,
+    private _type: JSONTokenType,
     private _segments: Array<string | number>,
   ) {}
 
@@ -63,7 +63,7 @@ class JSONChunk {
     return this._value;
   }
 
-  get type(): typeof JSONValue | typeof JSONTokenType {
+  get type(): JSONTokenType {
     return this._type;
   }
 
@@ -90,8 +90,12 @@ class JSONChunk {
  * stream.
  */
 export class JSONParserUseCase {
-  private lexer: Lexer<typeof JSONValue, typeof JSONTokenType>;
-  private dpda: DPDA<typeof JSONValue, typeof JSONTokenType>;
+  private lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>;
+  private dpda: DPDA<
+    typeof JSONTokenType,
+    typeof JSONTokenType,
+    typeof JSONValue
+  >;
   private path: Array<string | number> = [];
 
   /**
@@ -100,8 +104,8 @@ export class JSONParserUseCase {
    * @param {DPDA} dpda The DPDA instance used for parsing.
    */
   constructor(
-    lexer: Lexer<typeof JSONValue, typeof JSONTokenType>,
-    dpda: DPDA<typeof JSONValue, typeof JSONTokenType>,
+    lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>,
+    dpda: DPDA<typeof JSONTokenType, typeof JSONTokenType, typeof JSONValue>,
   ) {
     this.lexer = lexer;
     this.dpda = dpda;
@@ -121,15 +125,20 @@ export class JSONParserUseCase {
 }
 
 class JSONTransition extends DPDATransition<
-  JSONValue | "key" | "value" | null,
-  JSONTokenType
+  JSONTokenType,
+  JSONTokenType,
+  JSONValue | "key" | "value" | null
 > {}
 
 /**
  * Null currentState means stackTop is the state
  */
 const objectTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open object (JSON element is an object)
   new JSONTransition(
@@ -384,7 +393,11 @@ const objectTransitions: Array<
 ];
 
 const arrayTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open array (JSON element is an array)
   new JSONTransition(
@@ -610,7 +623,11 @@ const arrayTransitions: Array<
 ];
 
 const stringTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open string (JSON element is a string)
   new JSONTransition(
@@ -638,7 +655,13 @@ const stringTransitions: Array<
   ),
 ];
 
-const numberTransitions = [
+const numberTransitions: Array<
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
+> = [
   // Open number
   new JSONTransition(
     null, // We're waiting for a value, and
@@ -706,7 +729,11 @@ const numberTransitions = [
 ];
 
 const trueTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open true
   new JSONTransition(
@@ -783,7 +810,11 @@ const trueTransitions: Array<
 ];
 
 const falseTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open false
   new JSONTransition(
@@ -860,7 +891,11 @@ const falseTransitions: Array<
 ];
 
 const nullTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
+  DPDATransition<
+    JSONTokenType,
+    JSONTokenType,
+    JSONValue | "key" | "value" | null
+  >
 > = [
   // Open null
   new JSONTransition(

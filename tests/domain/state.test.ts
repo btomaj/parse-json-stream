@@ -121,11 +121,17 @@ describe("DPDA", () => {
     ),
   ];
 
-  class TestDPDA extends DPDA<typeof TestState, typeof TestInputSymbol> {}
+  class TestDPDA extends DPDA<
+    typeof TestState,
+    typeof TestInputSymbol,
+    typeof TestState
+  > {}
 
   it("should initialize to initial state", () => {
     // Arrange & Act
-    const dpda = new TestDPDA(testTransitions, TestState.Initial);
+    const dpda = new TestDPDA(testTransitions, TestState.Initial, [
+      TestState.Initial,
+    ]);
 
     // Assert
     expect(dpda.state).toBe(TestState.Initial);
@@ -133,7 +139,9 @@ describe("DPDA", () => {
 
   it("should transition states", () => {
     // Arrange
-    const dpda = new TestDPDA(testTransitions, TestState.Initial);
+    const dpda = new TestDPDA(testTransitions, TestState.Initial, [
+      TestState.Initial,
+    ]);
 
     // Act
     dpda.transition(TestInputSymbol.Open);
@@ -164,7 +172,9 @@ describe("DPDA", () => {
         [],
       ),
     ];
-    const dpda = new TestDPDA(emptyStackTransitions, TestState.Initial);
+    const dpda = new TestDPDA(emptyStackTransitions, TestState.Initial, [
+      TestState.Initial,
+    ]);
     dpda.transition(TestInputSymbol.Open);
 
     // Act & Assert
@@ -175,7 +185,7 @@ describe("DPDA", () => {
 
   it("should throw error when no transition exists", () => {
     // Arrange
-    const dpda = new TestDPDA([], TestState.Initial);
+    const dpda = new TestDPDA([], TestState.Initial, [TestState.Initial]);
 
     // Act & Assert
     expect(() => dpda.transition(TestInputSymbol.Close)).toThrow(
@@ -185,7 +195,9 @@ describe("DPDA", () => {
 
   it("should restore stack when transition fails", () => {
     // Arrange
-    const dpda = new TestDPDA(testTransitions, TestState.Initial);
+    const dpda = new TestDPDA(testTransitions, TestState.Initial, [
+      TestState.Initial,
+    ]);
     dpda.transition(TestInputSymbol.Open);
     expect(() => dpda.transition(TestInputSymbol.End)).toThrow(
       `No transition for currentState: ${TestState.Initial}, inputSymbol: ${TestInputSymbol.End.toString()}, stackTop: ${TestState.Matching}`,
@@ -197,7 +209,9 @@ describe("DPDA", () => {
 
   it("should throw error on unbalanced parentheses", () => {
     // Arrange
-    const dpda = new TestDPDA(testTransitions, TestState.Initial);
+    const dpda = new TestDPDA(testTransitions, TestState.Initial, [
+      TestState.Initial,
+    ]);
 
     // Act & Assert - trying to close without matching open should fail
     expect(() => dpda.transition(TestInputSymbol.Close)).toThrow(

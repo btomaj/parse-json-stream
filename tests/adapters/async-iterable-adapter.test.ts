@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AsyncIterableProcessor } from "../../src/stream-adapter";
+import { AsyncIterableProcessor } from "~/lib/domain/stream-adapter";
 
 describe("AsyncIterableAdapter", () => {
   const chunkCallback = vi.fn();
@@ -304,7 +304,9 @@ describe("AsyncIterableAdapter", () => {
       async function* StubAsyncIterable() {
         yield "first";
         await new Promise((resolve) => setTimeout(resolve, 10));
-        if (stopCalled) return;
+        if (stopCalled) {
+          return;
+        }
         yield "second";
       }
 

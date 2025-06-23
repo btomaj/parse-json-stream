@@ -14,17 +14,15 @@ import { StreamProcessorFactory } from "~/lib/domain/stream-adapter";
  * - [ ] Replace template literal with nested map for transition lookup
  */
 
-class JSONFSM extends FSM<
-  typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
-  typeof JSONTokenType
-> {}
+class JSONFSM extends FSM<typeof JSONTokenType, typeof JSONTokenType> {}
 class JSONDPDA extends DPDA<
-  typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
-  typeof JSONTokenType
+  typeof JSONTokenType,
+  typeof JSONTokenType,
+  typeof JSONValue
 > {}
 
 export class JSONLexer extends Lexer<
-  typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
+  typeof JSONTokenType,
   typeof JSONTokenType
 > {
   private isEscaped = false;
@@ -66,9 +64,13 @@ export function parseStream(
     | WebSocket
     | AsyncIterable<string | Uint8Array | ArrayBuffer>,
 ): void {
-  const fsm = new JSONFSM(JSONTransitions, JSONValue.None);
-  const lexer = new JSONLexer(JSONValue, JSONTransitions, fsm);
-  const dpda = new JSONDPDA(JSONTransitions, JSONValue.None);
+  const fsm = new JSONFSM(JSONTransitions, JSONTokenType.Whitespace);
+  const lexer = new JSONLexer(JSONTokenType, JSONTransitions, fsm);
+  const dpda = new JSONDPDA(
+    JSONTransitions,
+    JSONTokenType.Whitespace,
+    JSONValue.None,
+  );
   const parser = new JSONParserUseCase(lexer, dpda);
 
   const processor = StreamProcessorFactory.create(stream);

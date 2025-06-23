@@ -1,28 +1,31 @@
 import { StateTokenType } from "./lexer";
 
-export class FSMTransition<S, I> extends StateTokenType<S, I> {
+export class FSMTransition<State, Input> extends StateTokenType<State, Input> {
   constructor(
-    currentState: S,
-    inputSymbol: I,
-    public nextState: S,
+    currentState: State,
+    inputSymbol: Input,
+    public nextState: State,
   ) {
     super(currentState, inputSymbol);
   }
 }
 
 export abstract class FSM<
-  S extends Record<string, string | number>,
-  I extends Record<string, string | symbol>,
+  State extends Record<string, string | number | symbol>,
+  Input extends Record<string, string | symbol>,
 > {
-  private _state: S[keyof S];
+  private _state: State[keyof State];
   protected transitions: Map<
-    S[keyof S],
-    Map<I[keyof I], FSMTransition<S[keyof S], I[keyof I]>>
+    State[keyof State],
+    Map<
+      Input[keyof Input],
+      FSMTransition<State[keyof State], Input[keyof Input]>
+    >
   > = new Map();
 
   constructor(
-    transitions: Array<FSMTransition<S[keyof S], I[keyof I]>>,
-    initialState: S[keyof S],
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
+    initialState: State[keyof State],
   ) {
     for (const transition of transitions) {
       let stateTransitions = this.transitions.get(transition.currentState);
@@ -36,52 +39,71 @@ export abstract class FSM<
     this._state = initialState;
   }
 
-  get state(): S[keyof S] {
+  get state(): State[keyof State] {
     return this._state;
   }
 
-  transition(inputSymbol: I[keyof I]): FSMTransition<S[keyof S], I[keyof I]> {
+  transition(
+    inputSymbol: Input[keyof Input],
+  ): FSMTransition<State[keyof State], Input[keyof Input]> {
     const transition = this.transitions.get(this.state)?.get(inputSymbol);
     if (!transition) {
       throw new Error(
-        `No transition from state ${this.state} on ${inputSymbol.toString()}`,
+        `No transition from state ${this.state.toString()} on ${inputSymbol.toString()}`,
       );
     }
     this._state = transition.nextState;
     return transition;
   }
 
-  reset(state: S[keyof S]) {
+  reset(state: State[keyof State]) {
     this._state = state;
   }
 }
 
-export class DPDATransition<S, I> extends FSMTransition<S, I> {
+export class DPDATransition<State, Input, Stack> extends FSMTransition<
+  State,
+  Input
+> {
   constructor(
-    currentState: S,
-    inputSymbol: I,
-    public stackTop: S,
-    nextState: S,
-    public stackPush: Array<S>,
+    currentState: State,
+    inputSymbol: Input,
+    public stackTop: Stack,
+    nextState: State,
+    public stackPush: Array<Stack>,
   ) {
     super(currentState, inputSymbol, nextState);
   }
 }
 
 export abstract class DPDA<
-  S extends Record<string, string | number>,
-  I extends Record<string, string | symbol>,
+  State extends Record<string, string | number | symbol>,
+  Input extends Record<string, string | symbol>,
+  Stack extends Record<string, string | number | symbol>,
 > {
-  private _state: S[keyof S];
+  private _state: State[keyof State];
   private readonly transitions: Map<
-    S[keyof S],
-    Map<I[keyof I], Map<S[keyof S], DPDATransition<S[keyof S], I[keyof I]>>>
+    State[keyof State],
+    Map<
+      Input[keyof Input],
+      Map<
+        Stack[keyof Stack],
+        DPDATransition<
+          State[keyof State],
+          Input[keyof Input],
+          Stack[keyof Stack]
+        >
+      >
+    >
   > = new Map();
-  private readonly stack: Array<S[keyof S]> = [];
+  private readonly stack: Array<Stack[keyof Stack]> = [];
 
   constructor(
-    transitions: Array<DPDATransition<S[keyof S], I[keyof I]>>,
-    initialState: S[keyof S],
+    transitions: Array<
+      DPDATransition<State[keyof State], Input[keyof Input], Stack[keyof Stack]>
+    >,
+    initialState: State[keyof State],
+    initialStack: Array<Stack[keyof Stack]>,
   ) {
     this._state = initialState;
 
@@ -101,10 +123,10 @@ export abstract class DPDA<
       stackTransitions.set(transition.stackTop, transition);
     }
 
-    this.stack.push(initialState);
+    this.stack.push(...initialStack);
   }
 
-  get state(): S[keyof S] {
+  get state(): State[keyof State] {
     return this._state;
   }
 
@@ -112,11 +134,17 @@ export abstract class DPDA<
     return this.stack.length;
   }
 
-  transition(inputSymbol: I[keyof I]): DPDATransition<S[keyof S], I[keyof I]> {
+  transition(
+    inputSymbol: Input[keyof Input],
+  ): DPDATransition<
+    State[keyof State],
+    Input[keyof Input],
+    Stack[keyof Stack]
+  > {
     const stackTop = this.stack.pop();
     if (typeof stackTop === "undefined") {
       throw new Error(
-        `State stack is empty on transition from currentState: ${this.state} with inputSymbol: ${inputSymbol.toString()}`,
+        `State stack is empty on transition from currentState: ${this.state.toString()} with inputSymbol: ${inputSymbol.toString()}`,
       );
     }
 
@@ -127,7 +155,7 @@ export abstract class DPDA<
     if (!transition) {
       this.stack.push(stackTop);
       throw new Error(
-        `No transition for currentState: ${this.state}, inputSymbol: ${inputSymbol.toString()}, stackTop: ${stackTop}`,
+        `No transition for currentState: ${this.state.toString()}, inputSymbol: ${inputSymbol.toString()}, stackTop: ${stackTop.toString()}`,
       );
     }
 
