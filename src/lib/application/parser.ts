@@ -11,39 +11,38 @@ export enum JSONValue {
   Array = "array",
   String = "string",
   Number = "number",
-  True = "boolean_true",
-  False = "boolean_false",
+  True = "true",
+  False = "false",
   Null = "null",
 }
 
 /**
- *
- * | Character        | Lexeme                | Description         |
- * | ---------------- | --------------------- | ------------------- |
- * | `LBRACE`         | `{`                   | Start of an object  |
- * | `RBRACE`         | `}`                   | End of an object    |
- * | `LBRACKET`       | `[`                   | Start of an array   |
- * | `RBRACKET`       | `]`                   | End of an array     |
- * | `COLON`          | `:`                   | Key/value separator |
- * | `COMMA`          | `,`                   | Separator for items |
- * | `QUOTATIONMARK`  | `"`                   | Quoted Unicode text |
- * | `NUMBER`         | `-`, `1`, `2`, etc.   | Integer or float    |
- * | `TRUE`           | `true`                | Boolean literal     |
- * | `FALSE`          | `false`               | Boolean literal     |
- * | `NULL`           | `null`                | Null literal        |
- * | `ESCAPE`         | `\`                   | Escape character    |
- * | `WHITESPACE`     | ` `, `\t`, `\n`, `\r` | Whitespace          |
+ * | Token type   | Delimiter             | Description              |
+ * | ------------ | --------------------- | ------------------------ |
+ * | `LBRACE`     | `{`                   | Start of an object       |
+ * | `RBRACE`     | `}`                   | End of an object         |
+ * | `LBRACKET`   | `[`                   | Start of an array        |
+ * | `RBRACKET`   | `]`                   | End of an array          |
+ * | `COLON`      | `:`                   | Key-value separator      |
+ * | `COMMA`      | `,`                   | Member/element separator |
+ * | `STRING`     | `"`                   | Start/end of a string    |
+ * | `NUMBER`     | `-`, `1`, `2`, etc.   | Integer or float         |
+ * | `TRUE`       | `true`                | True literal             |
+ * | `FALSE`      | `false`               | False literal            |
+ * | `NULL`       | `null`                | Null literal             |
+ * | `ESCAPE`     | `\`                   | Escape character         |
+ * | `WHITESPACE` | ` `, `\t`, `\n`, `\r` | Whitespace               |
  *
  * @enum {symbol}
  */
-export const JSONCharacter = {
+export const JSONTokenType = {
   LBrace: Symbol("{"),
   RBrace: Symbol("}"),
   LBracket: Symbol("["),
   RBracket: Symbol("]"),
   Colon: Symbol(":"),
   Comma: Symbol(","),
-  QuotationMark: Symbol('"'),
+  String: Symbol('"'),
   Number: Symbol("-0123456789"),
   True: Symbol("t"),
   False: Symbol("f"),
@@ -51,12 +50,12 @@ export const JSONCharacter = {
   Escape: Symbol("\\"),
   Whitespace: Symbol(" \t\n\r"),
 } as const;
-export type JSONCharacter = (typeof JSONCharacter)[keyof typeof JSONCharacter];
+export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
 
 class JSONChunk {
   constructor(
     private _value: string,
-    private _type: typeof JSONValue | typeof JSONCharacter,
+    private _type: typeof JSONValue | typeof JSONTokenType,
     private _segments: Array<string | number>,
   ) {}
 
@@ -64,7 +63,7 @@ class JSONChunk {
     return this._value;
   }
 
-  get type(): typeof JSONValue | typeof JSONCharacter {
+  get type(): typeof JSONValue | typeof JSONTokenType {
     return this._type;
   }
 
@@ -91,8 +90,8 @@ class JSONChunk {
  * stream.
  */
 export class JSONParserUseCase {
-  private lexer: Lexer<typeof JSONValue, typeof JSONCharacter>;
-  private dpda: DPDA<typeof JSONValue, typeof JSONCharacter>;
+  private lexer: Lexer<typeof JSONValue, typeof JSONTokenType>;
+  private dpda: DPDA<typeof JSONValue, typeof JSONTokenType>;
   private path: Array<string | number> = [];
 
   /**
@@ -101,8 +100,8 @@ export class JSONParserUseCase {
    * @param {DPDA} dpda The DPDA instance used for parsing.
    */
   constructor(
-    lexer: Lexer<typeof JSONValue, typeof JSONCharacter>,
-    dpda: DPDA<typeof JSONValue, typeof JSONCharacter>,
+    lexer: Lexer<typeof JSONValue, typeof JSONTokenType>,
+    dpda: DPDA<typeof JSONValue, typeof JSONTokenType>,
   ) {
     this.lexer = lexer;
     this.dpda = dpda;
@@ -113,7 +112,7 @@ export class JSONParserUseCase {
 
     // TODO: Manage depth state using dpda
     for await (const token of tokens) {
-      if (Object.values(JSONCharacter).includes(token.type)) {
+      if (Object.values(JSONTokenType).includes(token.type)) {
         this.dpda.transition(token.type);
       }
       yield new JSONChunk(token.lexeme, token.type, [...this.path]);
@@ -123,19 +122,19 @@ export class JSONParserUseCase {
 
 class JSONTransition extends DPDATransition<
   JSONValue | "key" | "value" | null,
-  JSONCharacter
+  JSONTokenType
 > {}
 
 /**
  * Null currentState means stackTop is the state
  */
 const objectTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open object (JSON element is an object)
   new JSONTransition(
     null, // stackTop is the value, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     null, // without stackTop,
     null, // so the next value is the object, and
     [JSONValue.Object], // we step inside the object
@@ -143,7 +142,7 @@ const objectTransitions: Array<
   // Close object
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [], // we return to the parent
@@ -151,7 +150,7 @@ const objectTransitions: Array<
   // Close object fail-safe
   new JSONTransition(
     null, // stackTop is the value, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [], // we return to the parent
@@ -159,7 +158,7 @@ const objectTransitions: Array<
   // Open object key
   new JSONTransition(
     null, // stackTop is the value, and
-    JSONCharacter.QuotationMark, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Object, // inside an object,
     "key", // so we've found a key, and
     [JSONValue.Object], // stay inside the object
@@ -167,7 +166,7 @@ const objectTransitions: Array<
   // Escape in object key
   new JSONTransition(
     "key", // Value is the key, and
-    JSONCharacter.Escape, // we find a reverse solidus
+    JSONTokenType.Escape, // we find a reverse solidus
     JSONValue.Object, // inside an object,
     "key", // so we continue parsing the key, and
     [JSONValue.Object], // stay inside the object
@@ -175,7 +174,7 @@ const objectTransitions: Array<
   // Close object key
   new JSONTransition(
     "key", // Value is the key, and
-    JSONCharacter.QuotationMark, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Object, // inside an object,
     null, // so next value is the object, and
     [JSONValue.Object], // stay inside the object
@@ -183,7 +182,7 @@ const objectTransitions: Array<
   // Open object value
   new JSONTransition(
     null, // Value is the object, and
-    JSONCharacter.Colon, // we find a colon
+    JSONTokenType.Colon, // we find a colon
     JSONValue.Object, // inside an object,
     "value", // so we wait for a value, and
     [JSONValue.Object], // stay inside the object
@@ -191,7 +190,7 @@ const objectTransitions: Array<
   // Close object value
   new JSONTransition(
     "value", // We're waiting for a value, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Object, // inside an object,
     null, // so we return to the object to look for a key, and
     [JSONValue.Object], // stay inside the object
@@ -199,7 +198,7 @@ const objectTransitions: Array<
   // Open object value: object
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     JSONValue.Object, // inside an object
     null, // so the next value is the new object, and
     [JSONValue.Object, JSONValue.Object], // we step inside the new object
@@ -216,7 +215,7 @@ const objectTransitions: Array<
   // Open object value: array
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     JSONValue.Object, // inside an object
     JSONValue.Array, // so we're waiting for a value, and
     [JSONValue.Object, JSONValue.Array], // step inside the array
@@ -233,7 +232,7 @@ const objectTransitions: Array<
   // Open object value: string
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Object, // inside an object
     JSONValue.String, // so the next Value is a string, and
     [JSONValue.Object], // we stay inside the object
@@ -241,7 +240,7 @@ const objectTransitions: Array<
   // Open object value: string escape
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.Escape, // we find a reverse solidus
+    JSONTokenType.Escape, // we find a reverse solidus
     JSONValue.Object, // inside an object
     JSONValue.String, // so the next Value is a string, and
     [JSONValue.Object], // we stay inside the object
@@ -249,7 +248,7 @@ const objectTransitions: Array<
   // Close string object: string
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Object, // inside an object,
     null, // so we've finished parsing the value, await JSONTokenType.Comma, or JSONTokenType.ObjectClose, and
     [JSONValue.Object], // stay inside the object
@@ -257,7 +256,7 @@ const objectTransitions: Array<
   // Open object value: number
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.Number, // we find a number
+    JSONTokenType.Number, // we find a number
     JSONValue.Object, // inside an object
     JSONValue.Number, // so the next Value is a number, and
     [JSONValue.Object], // we stay inside the object
@@ -265,7 +264,7 @@ const objectTransitions: Array<
   // Close object value: number (whitespace)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Object, // inside an object,
     null, // so we've finished parsing the value, await JSONTokenType.Comma, or JSONTokenType.ObjectClose, and
     [JSONValue.Object], // stay inside the object
@@ -273,7 +272,7 @@ const objectTransitions: Array<
   // Close object value: number (comma)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Object, // inside an object,
     null, // so we return to the parent object to look for a key, and
     [JSONValue.Object], // stay inside the object
@@ -281,7 +280,7 @@ const objectTransitions: Array<
   // Close object value: number (object close)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -289,7 +288,7 @@ const objectTransitions: Array<
   // Open object value: true
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     JSONValue.Object, // inside an object
     JSONValue.True, // so the next value is the boolean true, and
     [JSONValue.Object], // we stay inside the object
@@ -297,7 +296,7 @@ const objectTransitions: Array<
   // Close object value: true (whitespace)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Object, // inside an object,
     null, // so we've finished parsing the value, await JSONTokenType.Comma, or JSONTokenType.ObjectClose, and
     [JSONValue.Object], // stay inside the object
@@ -305,7 +304,7 @@ const objectTransitions: Array<
   // Close object value: true (comma)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Object, // inside an object,
     null, // so we return to the parent object to look for a key, and
     [JSONValue.Object], // stay inside the object
@@ -313,7 +312,7 @@ const objectTransitions: Array<
   // Close object value: true (object close)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -321,7 +320,7 @@ const objectTransitions: Array<
   // Open object value: false
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     JSONValue.Object, // inside an object
     JSONValue.False, // so the next value is the boolean false, and
     [JSONValue.Object], // we stay inside the object
@@ -329,7 +328,7 @@ const objectTransitions: Array<
   // Close object value: false (whitespace)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Object, // inside an object,
     null, // so we've finished parsing the value, await JSONTokenType.Comma, or JSONTokenType.ObjectClose, and
     [JSONValue.Object], // stay inside the object
@@ -337,7 +336,7 @@ const objectTransitions: Array<
   // Close object value: false (comma)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Object, // inside an object,
     null, // so we return to the parent object to look for a key, and
     [JSONValue.Object], // stay inside the object
@@ -345,7 +344,7 @@ const objectTransitions: Array<
   // Close object value: false (object close)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -353,7 +352,7 @@ const objectTransitions: Array<
   // Open object value: null
   new JSONTransition(
     JSONValue.Object, // We're waiting for a value, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     JSONValue.Object, // inside an object
     JSONValue.Null, // so the next value is the primitive null, and
     [JSONValue.Object], // we stay inside the object
@@ -361,7 +360,7 @@ const objectTransitions: Array<
   // Close object value: null (whitespace)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Object, // inside an object,
     null, // so we've finished parsing the value, await JSONTokenType.Comma, or JSONTokenType.ObjectClose, and
     [JSONValue.Object], // stay inside the object
@@ -369,7 +368,7 @@ const objectTransitions: Array<
   // Close object value: null (comma)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Object, // inside an object,
     null, // so we return to the parent object to look for a key, and
     [JSONValue.Object], // stay inside the object
@@ -377,7 +376,7 @@ const objectTransitions: Array<
   // Close object value: null (object close)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.RBrace, // we find a right brace
+    JSONTokenType.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -385,12 +384,12 @@ const objectTransitions: Array<
 ];
 
 const arrayTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open array (JSON element is an array)
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     null, // without context,
     JSONValue.Array, // so we're waiting for a value, and
     [JSONValue.Array], // step inside the array
@@ -398,7 +397,7 @@ const arrayTransitions: Array<
   // Close array
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -406,7 +405,7 @@ const arrayTransitions: Array<
   // Close array fail-safe
   new JSONTransition(
     null, // We have finished parsing an element, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so the next value is the parent, and
     [null], // we return to the parent
@@ -417,7 +416,7 @@ const arrayTransitions: Array<
   // Close array element
   new JSONTransition(
     null, // We have finished parsing an element, and
-    JSONCharacter.Comma, // we find a comma,
+    JSONTokenType.Comma, // we find a comma,
     JSONValue.Array, // inside an array,
     JSONValue.Array, // so we're waiting for the next value, and
     [JSONValue.Array], // stay inside the array
@@ -425,7 +424,7 @@ const arrayTransitions: Array<
   // Open array element: array
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     JSONValue.Array, // inside an array,
     JSONValue.Array, // so we're waiting for a value in the new array, and
     [JSONValue.Array, JSONValue.Array], // step inside the new array
@@ -442,7 +441,7 @@ const arrayTransitions: Array<
   // Open array element: object
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     JSONValue.Array, // inside an array,
     null, // so the next value is the new object, and
     [JSONValue.Array, JSONValue.Object], // step inside the new object
@@ -459,7 +458,7 @@ const arrayTransitions: Array<
   // Open array element: string
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Array, // inside an array,
     JSONValue.String, // so we've found a string, and
     [JSONValue.Array], // stay inside the array
@@ -467,7 +466,7 @@ const arrayTransitions: Array<
   // Open array element: string escape
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.Escape, // we find a reverse solidus
+    JSONTokenType.Escape, // we find a reverse solidus
     JSONValue.Array, // inside an array
     JSONValue.String, // so the next Value is a string, and
     [JSONValue.Array], // we stay inside the array
@@ -475,7 +474,7 @@ const arrayTransitions: Array<
   // Close array element: string
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, await JSONTokenType.Comma, or JSONTokenType.ArrayClose, and
     [JSONValue.Array], // stay inside the array
@@ -483,7 +482,7 @@ const arrayTransitions: Array<
   // Open array element: number
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.Number, // we find a number
+    JSONTokenType.Number, // we find a number
     JSONValue.Array, // inside an array
     JSONValue.Number, // so the next Value is a number, and
     [JSONValue.Array], // we stay inside the array
@@ -491,7 +490,7 @@ const arrayTransitions: Array<
   // Close object value: number (whitespace)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, await JSONTokenType.Comma, or JSONTokenType.ArrayClose, and
     [JSONValue.Array], // stay inside the array
@@ -499,7 +498,7 @@ const arrayTransitions: Array<
   // Close array element: number (comma)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, are waiting for a value, and
     [JSONValue.Array], // stay inside the array
@@ -507,7 +506,7 @@ const arrayTransitions: Array<
   // Close array element: number (array close)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so we set the value to null, and
     [null], // return to the parent
@@ -515,7 +514,7 @@ const arrayTransitions: Array<
   // Open array element: true
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     JSONValue.Array, // inside an array
     JSONValue.True, // so the next value is the boolean true, and
     [JSONValue.Array], // we stay inside the array
@@ -523,7 +522,7 @@ const arrayTransitions: Array<
   // Close array element: true (whitespace)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, await JSONTokenType.Comma, or JSONTokenType.ArrayClose, and
     [JSONValue.Array], // stay inside the array
@@ -531,7 +530,7 @@ const arrayTransitions: Array<
   // Close array element: true (comma)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, are waiting for a value, and
     [JSONValue.Array], // stay inside the array
@@ -539,7 +538,7 @@ const arrayTransitions: Array<
   // Close array element: true (array close)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so we set the value to null, and
     [null], // return to the parent
@@ -547,7 +546,7 @@ const arrayTransitions: Array<
   // Open array element: false
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     JSONValue.Array, // inside an array
     JSONValue.False, // so the next value is the boolean false, and
     [JSONValue.Array], // we stay inside the array
@@ -555,7 +554,7 @@ const arrayTransitions: Array<
   // Close array element: false (whitespace)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, await JSONTokenType.Comma, or JSONTokenType.ArrayClose, and
     [JSONValue.Array], // stay inside the array
@@ -563,7 +562,7 @@ const arrayTransitions: Array<
   // Close array element: false (comma)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, are waiting for a value, and
     [JSONValue.Array], // stay inside the array
@@ -571,7 +570,7 @@ const arrayTransitions: Array<
   // Close array element: false (array close)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so we set the value to null, and
     [null], // return to the parent
@@ -579,7 +578,7 @@ const arrayTransitions: Array<
   // Open array element: null
   new JSONTransition(
     JSONValue.Array, // We're waiting for a value, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     JSONValue.Array, // inside an array
     JSONValue.Null, // so the next value is the primitive null, and
     [JSONValue.Array], // we stay inside the array
@@ -587,7 +586,7 @@ const arrayTransitions: Array<
   // Close array element: null (whitespace)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, await JSONTokenType.Comma, or JSONTokenType.ArrayClose, and
     [JSONValue.Array], // stay inside the array
@@ -595,7 +594,7 @@ const arrayTransitions: Array<
   // Close array element: null (comma)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.Comma, // we find a comma
+    JSONTokenType.Comma, // we find a comma
     JSONValue.Array, // inside an array,
     null, // so we've finished parsing the element, are waiting for a value, and
     [JSONValue.Array], // stay inside the array
@@ -603,7 +602,7 @@ const arrayTransitions: Array<
   // Close array element: null (array close)
   new JSONTransition(
     JSONValue.Null, // Value is null, and
-    JSONCharacter.RBracket, // we find a right bracket
+    JSONTokenType.RBracket, // we find a right bracket
     JSONValue.Array, // inside an array,
     null, // so we set the value to null, and
     [null], // return to the parent
@@ -611,12 +610,12 @@ const arrayTransitions: Array<
 ];
 
 const stringTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open string (JSON element is a string)
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context,
     JSONValue.String, // so we've found a string, and
     [null], // stay without context
@@ -624,7 +623,7 @@ const stringTransitions: Array<
   // Close string
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context
     null, // so we set the value to null, and
     [null], // stay without context
@@ -632,7 +631,7 @@ const stringTransitions: Array<
   // Open string escape
   new JSONTransition(
     JSONValue.String, // Value is a string, and
-    JSONCharacter.Escape, // we find an escape character
+    JSONTokenType.Escape, // we find an escape character
     null, // without context
     JSONValue.String, // so we return to the string, and
     [null], // stay without context
@@ -643,7 +642,7 @@ const numberTransitions = [
   // Open number
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.Number, // we find a number
+    JSONTokenType.Number, // we find a number
     null, // without context
     JSONValue.Number, // so we've found a number, and
     [null], // stay without context
@@ -651,7 +650,7 @@ const numberTransitions = [
   // Close number (whitespace)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     null, // without context
     null, // so we set the value to null, and
     [null], // stay without context
@@ -659,7 +658,7 @@ const numberTransitions = [
   // Close number (object start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     null, // without context
     JSONValue.Object, // so we have found an object, and
     [JSONValue.Object], // step inside the object
@@ -667,7 +666,7 @@ const numberTransitions = [
   // Close number (array start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     null, // without context
     JSONValue.Array, // so we've found an array, and
     [JSONValue.Array], // step inside the array
@@ -675,7 +674,7 @@ const numberTransitions = [
   // Close number (string start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context
     JSONValue.String, // so we've found a string, and
     [null], // stay without context
@@ -683,7 +682,7 @@ const numberTransitions = [
   // Close number (true start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     null, // without context
     JSONValue.True, // so we've found the boolean true, and
     [null], // stay without context
@@ -691,7 +690,7 @@ const numberTransitions = [
   // Close number (false start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     null, // without context
     JSONValue.False, // so we've found the boolean false, and
     [null], // stay without context
@@ -699,7 +698,7 @@ const numberTransitions = [
   // Close number (null start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     null, // without context
     JSONValue.Null, // so we've found the primitive null, and
     [null], // stay without context
@@ -707,12 +706,12 @@ const numberTransitions = [
 ];
 
 const trueTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open true
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     null, // without context
     JSONValue.True, // so we've found the boolean true, and
     [null], // stay without context
@@ -720,7 +719,7 @@ const trueTransitions: Array<
   // Close true (whitespace)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     null, // without context
     null, // so we set the value to null, and
     [null], // stay without context
@@ -728,7 +727,7 @@ const trueTransitions: Array<
   // Close true (object start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     null, // without context
     JSONValue.Object, // so we have found an object, and
     [JSONValue.Object], // step inside the object
@@ -736,7 +735,7 @@ const trueTransitions: Array<
   // Close true (array start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     null, // without context
     JSONValue.Array, // so we've found an array, and
     [JSONValue.Array], // step inside the array
@@ -744,7 +743,7 @@ const trueTransitions: Array<
   // Close true (string start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context
     JSONValue.String, // so we've found a string, and
     [null], // stay without context
@@ -752,7 +751,7 @@ const trueTransitions: Array<
   // Close true (number start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Number, // we find a number
+    JSONTokenType.Number, // we find a number
     null, // without context
     JSONValue.Number, // so we've found a number, and
     [null], // stay without context
@@ -760,7 +759,7 @@ const trueTransitions: Array<
   // Close true (true start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     null, // without context
     JSONValue.True, // so we've found a true value, and
     [null], // stay without context
@@ -768,7 +767,7 @@ const trueTransitions: Array<
   // Close true (false start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     null, // without context
     JSONValue.False, // so we've found a false value, and
     [null], // stay without context
@@ -776,7 +775,7 @@ const trueTransitions: Array<
   // Close true (null start)
   new JSONTransition(
     JSONValue.True, // Value is the boolean true, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     null, // without context
     JSONValue.Null, // so we've found the primitive null, and
     [null], // stay without context
@@ -784,12 +783,12 @@ const trueTransitions: Array<
 ];
 
 const falseTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open false
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     null, // without context
     JSONValue.False, // so we've found the boolean false, and
     [null], // stay without context
@@ -797,7 +796,7 @@ const falseTransitions: Array<
   // Close false (whitespace)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     null, // without context
     null, // so we set the value to null, and
     [null], // stay without context
@@ -805,7 +804,7 @@ const falseTransitions: Array<
   // Close false (object start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     null, // without context
     JSONValue.Object, // so we have found an object, and
     [JSONValue.Object], // step inside the object
@@ -813,7 +812,7 @@ const falseTransitions: Array<
   // Close false (array start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     null, // without context
     JSONValue.Array, // so we've found an array, and
     [JSONValue.Array], // step inside the array
@@ -821,7 +820,7 @@ const falseTransitions: Array<
   // Close false (string start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context
     JSONValue.String, // so we've found a string, and
     [null], // stay without context
@@ -829,7 +828,7 @@ const falseTransitions: Array<
   // Close false (number start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Number, // we find a true keyword
+    JSONTokenType.Number, // we find a true keyword
     null, // without context
     JSONValue.Number, // so we've found a true value, and
     [null], // stay without context
@@ -837,7 +836,7 @@ const falseTransitions: Array<
   // Close false (true start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     null, // without context
     JSONValue.True, // so we've found the boolean true, and
     [null], // stay without context
@@ -845,7 +844,7 @@ const falseTransitions: Array<
   // Close false (false start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     null, // without context
     JSONValue.False, // so we've found the boolean false, and
     [null], // stay without context
@@ -853,7 +852,7 @@ const falseTransitions: Array<
   // Close false (null start)
   new JSONTransition(
     JSONValue.False, // Value is the boolean false, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     null, // without context
     JSONValue.Null, // so we've found the primitive null, and
     [null], // stay without context
@@ -861,12 +860,12 @@ const falseTransitions: Array<
 ];
 
 const nullTransitions: Array<
-  DPDATransition<JSONValue | "key" | "value" | null, JSONCharacter>
+  DPDATransition<JSONValue | "key" | "value" | null, JSONTokenType>
 > = [
   // Open null
   new JSONTransition(
     null, // We're waiting for a value, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     null, // without context
     JSONValue.Null, // so we've found the primitive null, and
     [null], // stay without context
@@ -874,7 +873,7 @@ const nullTransitions: Array<
   // Close null (whitespace)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.Whitespace, // we find a whitespace
+    JSONTokenType.Whitespace, // we find a whitespace
     null, // without context
     null, // so we set the value to null, and
     [null], // stay without context
@@ -882,7 +881,7 @@ const nullTransitions: Array<
   // Close null (object start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.LBrace, // we find a left brace
+    JSONTokenType.LBrace, // we find a left brace
     null, // without context
     JSONValue.Object, // so we have found an object, and
     [JSONValue.Object], // step inside the object
@@ -890,7 +889,7 @@ const nullTransitions: Array<
   // Close null (array start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.LBracket, // we find a left bracket
+    JSONTokenType.LBracket, // we find a left bracket
     null, // without context
     JSONValue.Array, // so we've found an array, and
     [JSONValue.Array], // step inside the array
@@ -898,7 +897,7 @@ const nullTransitions: Array<
   // Close null (string start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.String, // we find a quotation mark
+    JSONTokenType.String, // we find a quotation mark
     null, // without context
     JSONValue.String, // so we've found a string, and
     [null], // stay without context
@@ -906,7 +905,7 @@ const nullTransitions: Array<
   // Close null (number start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.Number, // we find a number
+    JSONTokenType.Number, // we find a number
     null, // without context
     JSONValue.Number, // so we've found a true value, and
     [null], // stay without context
@@ -914,7 +913,7 @@ const nullTransitions: Array<
   // Close null (true start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.True, // we find the letter t
+    JSONTokenType.True, // we find the letter t
     null, // without context
     JSONValue.True, // so we've found the boolean true, and
     [null], // stay without context
@@ -922,7 +921,7 @@ const nullTransitions: Array<
   // Close null (false start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.False, // we find the letter f
+    JSONTokenType.False, // we find the letter f
     null, // without context
     JSONValue.False, // so we've found the boolean false, and
     [null], // stay without context
@@ -930,7 +929,7 @@ const nullTransitions: Array<
   // Close null (null start)
   new JSONTransition(
     JSONValue.Null, // Value is the primitive null, and
-    JSONCharacter.Null, // we find the letter n
+    JSONTokenType.Null, // we find the letter n
     null, // without context
     JSONValue.Null, // so we've found the primitive null, and
     [null], // stay without context

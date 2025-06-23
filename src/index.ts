@@ -1,6 +1,6 @@
 import {
-  JSONCharacter,
   JSONParserUseCase,
+  JSONTokenType,
   JSONTransitions,
   JSONValue,
 } from "~/lib/application/parser";
@@ -16,16 +16,16 @@ import { StreamProcessorFactory } from "~/lib/domain/stream-adapter";
 
 class JSONFSM extends FSM<
   typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
-  typeof JSONCharacter
+  typeof JSONTokenType
 > {}
 class JSONDPDA extends DPDA<
   typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
-  typeof JSONCharacter
+  typeof JSONTokenType
 > {}
 
 export class JSONLexer extends Lexer<
   typeof JSONValue & { Key: "key"; Value: "value"; Null: null },
-  typeof JSONCharacter
+  typeof JSONTokenType
 > {
   private isEscaped = false;
   private buffer = "";
@@ -34,14 +34,14 @@ export class JSONLexer extends Lexer<
     const tokens = this.yieldToken(chunk);
     for (const token of tokens) {
       switch (token.type) {
-        case JSONCharacter.Escape:
+        case JSONTokenType.Escape:
           // biome-ignore  lint/suspicious/noFallthroughSwitchClause: DRY
           // this.buffer += token.lexeme;
           this.isEscaped = true;
-        case JSONCharacter.Number:
-        case JSONCharacter.True:
-        case JSONCharacter.False:
-        case JSONCharacter.Null:
+        case JSONTokenType.Number:
+        case JSONTokenType.True:
+        case JSONTokenType.False:
+        case JSONTokenType.Null:
           this.buffer += token.lexeme;
           continue;
       }
