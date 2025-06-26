@@ -1,26 +1,124 @@
 import invariant from "tiny-invariant";
-import type { FSM } from "./state";
 
-export class StateTokenType<State, Input> {
-  constructor(
-    public readonly currentState: State,
-    public readonly inputSymbol: Input,
-  ) {}
+export enum JSONValue {
+  None = "none",
+  Object = "object",
+  Array = "array",
+  String = "string",
+  Number = "number",
+  True = "true",
+  False = "false",
+  Null = "null",
 }
+
+/**
+ * | Token type   | Delimiter             | Description              |
+ * | ------------ | --------------------- | ------------------------ |
+ * | `LBRACE`     | `{`                   | Start of an object       |
+ * | `RBRACE`     | `}`                   | End of an object         |
+ * | `LBRACKET`   | `[`                   | Start of an array        |
+ * | `RBRACKET`   | `]`                   | End of an array          |
+ * | `COLON`      | `:`                   | Key-value separator      |
+ * | `COMMA`      | `,`                   | Member/element separator |
+ * | `STRING`     | `"`                   | Start/end of a string    |
+ * | `NUMBER`     | `-`, `1`, `2`, etc.   | Integer or float         |
+ * | `TRUE`       | `t`                   | True literal             |
+ * | `FALSE`      | `f`                   | False literal            |
+ * | `NULL`       | `n`                   | Null literal             |
+ * | `ESCAPE`     | `\`                   | Escape character         |
+ * | `WHITESPACE` | ` `, `\t`, `\n`, `\r` | Whitespace               |
+ *
+ * @enum {symbol}
+ */
+export const JSONTokenType = {
+  LBrace: Symbol("{"),
+  RBrace: Symbol("}"),
+  LBracket: Symbol("["),
+  RBracket: Symbol("]"),
+  Colon: Symbol(":"),
+  Comma: Symbol(","),
+  String: Symbol('"'),
+  Number: Symbol("-0123456789"),
+  True: Symbol("t"),
+  False: Symbol("f"),
+  Null: Symbol("n"),
+  Escape: Symbol("\\"),
+  Whitespace: Symbol(" \t\n\r"),
+} as const;
+export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
 
 export interface LexerToken<TokenType> {
   type: TokenType[keyof TokenType];
   lexeme: string;
 }
 
+export class FSMTransition<State, Input> {
+  constructor(
+    public readonly currentState: State,
+    public readonly inputSymbol: Input,
+    public readonly nextState: State,
+  ) {}
+}
+
+export abstract class FSM<
+  State extends Record<string, string | number | symbol>,
+  Input extends Record<string, string | symbol>,
+> {
+  private _state: State[keyof State];
+  protected transitions: Map<
+    State[keyof State],
+    Map<
+      Input[keyof Input],
+      FSMTransition<State[keyof State], Input[keyof Input]>
+    >
+  > = new Map();
+
+  constructor(
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
+    initialState: State[keyof State],
+  ) {
+    for (const transition of transitions) {
+      let stateTransitions = this.transitions.get(transition.currentState);
+      if (!stateTransitions) {
+        stateTransitions = new Map();
+        this.transitions.set(transition.currentState, stateTransitions);
+      }
+      stateTransitions.set(transition.inputSymbol, transition);
+    }
+
+    this._state = initialState;
+  }
+
+  get state(): State[keyof State] {
+    return this._state;
+  }
+
+  transition(
+    inputSymbol: Input[keyof Input],
+  ): FSMTransition<State[keyof State], Input[keyof Input]> {
+    const transition = this.transitions.get(this.state)?.get(inputSymbol);
+    if (!transition) {
+      throw new Error(
+        `No transition from state ${this.state.toString()} on ${inputSymbol.toString()}`,
+      );
+    }
+    this._state = transition.nextState;
+    return transition;
+  }
+
+  reset(state: State[keyof State]) {
+    this._state = state;
+  }
+}
+
 /**
  * TODO
- * - [ ] Determine what should be async in the lexeme
+ * - [ ] Determine what should be async
  */
 export abstract class Lexer<
   State extends Record<string, string | number | symbol>,
   Input extends Record<string, string | symbol>,
-> {
+> extends FSM<State, Input> {
   private readonly stateBitFlags: Record<State[keyof State], number>;
   // bit mask for ASCII lexical rules
   private readonly unicodeCharacterBitMask:
@@ -29,21 +127,18 @@ export abstract class Lexer<
     | Uint32Array;
   // map of lexical rules to token types
   private readonly unicodeCharacterMap: Array<Input[keyof Input]> = [];
-  private readonly fsm: FSM<State, Input>;
 
   constructor(
     states: State,
-    stateTokenTypeMap: Array<
-      StateTokenType<State[keyof State], Input[keyof Input]>
-    >,
-    fsm: FSM<State, Input>,
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
+    initialState: State[keyof State],
   ) {
-    this.fsm = fsm;
+    super(transitions, initialState);
 
     this.stateBitFlags = this.createStateBitFlags(states);
     this.unicodeCharacterBitMask = this.createStateTokenTypeBitMask(
       this.stateBitFlags,
-      stateTokenTypeMap,
+      transitions,
     );
   }
 
@@ -69,7 +164,7 @@ export abstract class Lexer<
   private createStateTokenTypeBitMask(
     stateBitFlags: Record<State[keyof State], number>,
     stateTokenTypeMaps: Array<
-      StateTokenType<State[keyof State], Input[keyof Input]>
+      FSMTransition<State[keyof State], Input[keyof Input]>
     >,
   ): Uint8Array | Uint16Array | Uint32Array {
     let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
@@ -120,7 +215,7 @@ export abstract class Lexer<
       const code = chunk.charCodeAt(i);
       if (
         // bitwise AND
-        this.unicodeCharacterBitMask[code] & this.stateBitFlags[this.fsm.state]
+        this.unicodeCharacterBitMask[code] & this.stateBitFlags[this.state]
       ) {
         return [i, this.unicodeCharacterMap[code]];
       }
@@ -133,7 +228,7 @@ export abstract class Lexer<
       const [index, tokenType] = this.findFirstTokenTypeForState(chunk);
       // if there is no lexeme in the chunk, emit the chunk
       if (index < 0) {
-        yield { type: this.fsm.state, lexeme: chunk };
+        yield { type: this.state, lexeme: chunk };
         return;
       }
       // else there is a lexeme in the chunk
@@ -143,11 +238,11 @@ export abstract class Lexer<
       );
       // if the lexeme is not the first character in the chunk, emit everything up to (not including) the lexeme
       if (index > 0) {
-        yield { type: this.fsm.state, lexeme: chunk.slice(0, index) };
+        yield { type: this.state, lexeme: chunk.slice(0, index) };
       }
 
-      this.fsm.transition(tokenType);
-      yield { type: this.fsm.state, lexeme: chunk.slice(index, index + 1) };
+      this.transition(tokenType);
+      yield { type: this.state, lexeme: chunk.slice(index, index + 1) };
 
       // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
       // biome-ignore lint/style/noParameterAssign:
@@ -162,4 +257,40 @@ export abstract class Lexer<
    * @param {string} chunk A chunk to interpret.
    */
   abstract tokenise(chunk: string): AsyncGenerator<LexerToken<State>>;
+}
+
+export class JSONLexer extends Lexer<
+  typeof JSONTokenType,
+  typeof JSONTokenType
+> {
+  private isEscaped = false;
+  private buffer = "";
+
+  public async *tokenise(chunk: string) {
+    const tokens = this.yieldToken(chunk);
+    for (const token of tokens) {
+      switch (token.type) {
+        case JSONTokenType.Escape:
+          // biome-ignore  lint/suspicious/noFallthroughSwitchClause: DRY
+          // this.buffer += token.lexeme;
+          this.isEscaped = true;
+        case JSONTokenType.Number:
+        case JSONTokenType.True:
+        case JSONTokenType.False:
+        case JSONTokenType.Null:
+          this.buffer += token.lexeme;
+          continue;
+      }
+
+      if (this.buffer.length > 0) {
+        token.lexeme = this.buffer + token.lexeme;
+        this.buffer = "";
+      }
+      if (this.isEscaped) {
+        this.isEscaped = false;
+      }
+
+      yield token;
+    }
+  }
 }

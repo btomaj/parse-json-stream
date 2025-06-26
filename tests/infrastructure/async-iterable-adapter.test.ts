@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AsyncIterableProcessor } from "~/lib/domain/stream-adapter";
+import { AsyncIterableProcessor } from "~/lib/infrastructure/stream-adapter";
 
 describe("AsyncIterableAdapter", () => {
   const chunkCallback = vi.fn();

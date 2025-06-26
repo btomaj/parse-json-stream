@@ -1,6 +1,76 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Lexer, type LexerToken } from "~/lib/domain/lexer";
-import { FSM, FSMTransition } from "~/lib/domain/state";
+import { FSM, FSMTransition, Lexer, type LexerToken } from "~/lib/domain/lexer";
+
+describe("FSM", () => {
+  enum TestState {
+    Initial = 0,
+    A = 1,
+    B = 2,
+    Final = 3,
+  }
+
+  const TestInputSymbol = {
+    Zero: Symbol("0"),
+    One: Symbol("1"),
+    Two: Symbol("2"),
+  };
+  type TestInputSymbol = (typeof TestInputSymbol)[keyof typeof TestInputSymbol];
+
+  const testTransitions = [
+    new FSMTransition(TestState.Initial, TestInputSymbol.Zero, TestState.A),
+    new FSMTransition(TestState.Initial, TestInputSymbol.One, TestState.B),
+    new FSMTransition(TestState.A, TestInputSymbol.One, TestState.Final),
+    new FSMTransition(TestState.B, TestInputSymbol.Zero, TestState.Final),
+  ];
+
+  class TestFSM extends FSM<typeof TestState, typeof TestInputSymbol> {}
+
+  it("should initialize to initial state", () => {
+    // Arrange & Act
+    const fsm = new TestFSM(testTransitions, TestState.A);
+
+    // Assert
+    expect(fsm.state).toBe(TestState.A);
+  });
+
+  it("should transitions states", () => {
+    // Arrange
+    const fsm = new TestFSM(testTransitions, TestState.Initial);
+
+    // Act
+    fsm.transition(TestInputSymbol.Zero);
+    const transition = fsm.transition(TestInputSymbol.One);
+
+    // Assert
+    expect(transition.currentState).toBe(TestState.A);
+    expect(transition.inputSymbol).toBe(TestInputSymbol.One);
+    expect(transition.nextState).toBe(TestState.Final);
+    expect(fsm.state).toBe(TestState.Final);
+  });
+
+  it("should throw error when no transition exists", () => {
+    // Arrange
+    const fsm = new TestFSM(testTransitions, TestState.Initial);
+
+    // Act & Assert
+    expect(() => fsm.transition(TestInputSymbol.Two)).toThrow(
+      `No transition from state ${TestState.Initial} on ${TestInputSymbol.Two.toString()}`,
+    );
+  });
+
+  it("should reset state to specified state", () => {
+    // Arrange
+    const fsm = new TestFSM(testTransitions, TestState.Initial);
+    fsm.transition(TestInputSymbol.Zero);
+    expect(fsm.state).toBe(TestState.A);
+
+    // Act
+    fsm.reset(TestState.B);
+
+    // Assert
+    expect(fsm.state).toBe(TestState.B);
+  });
+});
 
 describe("Abstract Lexer", () => {
   enum TestState {
@@ -53,9 +123,9 @@ describe("Abstract Lexer", () => {
     constructor(
       states = TestState,
       transitions = testTransitions,
-      testFSM = new TestFSM(transitions, TestState.Initial),
+      initialState = TestState.Initial,
     ) {
-      super(states, transitions, testFSM);
+      super(states, transitions, initialState);
     }
 
     public async *tokenise(): AsyncGenerator<LexerToken<typeof TestState>> {}
@@ -135,46 +205,42 @@ describe("Abstract Lexer", () => {
 
   it("should initialise to initial state", () => {
     // Arrange & Act
-    const testFSM = new TestFSM(testTransitions, TestState.Initial);
-    const lexer = new TestLexer(TestState, testTransitions, testFSM);
+    const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Assert
-    expect(testFSM.state).toBe(TestState.Initial);
+    expect(lexer.state).toBe(TestState.Initial);
   });
 
   it("should not transition state in absence of rule match", () => {
     // Arrange
-    const testFSM = new TestFSM(testTransitions, TestState.Initial);
-    const lexer = new TestLexer(TestState, testTransitions, testFSM);
+    const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
     const tokens = lexer.testYieldToken("abc");
 
     // Assert
-    expect(testFSM.state).toBe(TestState.Initial);
+    expect(lexer.state).toBe(TestState.Initial);
   });
 
   it("should transition state on rule match only", () => {
     // Arrange
-    const testFSM = new TestFSM(testTransitions, TestState.Initial);
-    const lexer = new TestLexer(TestState, testTransitions, testFSM);
+    const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
     const tokens = lexer.testYieldToken("1abc");
 
     // Assert
-    expect(testFSM.state).toBe(TestState.Numbers);
+    expect(lexer.state).toBe(TestState.Numbers);
   });
 
   it("should transition state for every rule match", () => {
     // Arrange
-    const testFSM = new TestFSM(testTransitions, TestState.Initial);
-    const lexer = new TestLexer(TestState, testTransitions, testFSM);
+    const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
     const tokens = lexer.testYieldToken("1!");
 
     // Assert
-    expect(testFSM.state).toBe(TestState.Special);
+    expect(lexer.state).toBe(TestState.Special);
   });
 });

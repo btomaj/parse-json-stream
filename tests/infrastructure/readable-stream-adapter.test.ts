@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ReadableStreamProcessor } from "~/lib/domain/stream-adapter";
+import { ReadableStreamProcessor } from "~/lib/infrastructure/stream-adapter";
 
 class MockReadableStream extends ReadableStream<string> {
   public mockReader = {

@@ -1,65 +1,8 @@
-import { StateTokenType } from "./lexer";
-
-export class FSMTransition<State, Input> extends StateTokenType<State, Input> {
-  constructor(
-    currentState: State,
-    inputSymbol: Input,
-    public nextState: State,
-  ) {
-    super(currentState, inputSymbol);
-  }
-}
-
-export abstract class FSM<
-  State extends Record<string, string | number | symbol>,
-  Input extends Record<string, string | symbol>,
-> {
-  private _state: State[keyof State];
-  protected transitions: Map<
-    State[keyof State],
-    Map<
-      Input[keyof Input],
-      FSMTransition<State[keyof State], Input[keyof Input]>
-    >
-  > = new Map();
-
-  constructor(
-    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
-    initialState: State[keyof State],
-  ) {
-    for (const transition of transitions) {
-      let stateTransitions = this.transitions.get(transition.currentState);
-      if (!stateTransitions) {
-        stateTransitions = new Map();
-        this.transitions.set(transition.currentState, stateTransitions);
-      }
-      stateTransitions.set(transition.inputSymbol, transition);
-    }
-
-    this._state = initialState;
-  }
-
-  get state(): State[keyof State] {
-    return this._state;
-  }
-
-  transition(
-    inputSymbol: Input[keyof Input],
-  ): FSMTransition<State[keyof State], Input[keyof Input]> {
-    const transition = this.transitions.get(this.state)?.get(inputSymbol);
-    if (!transition) {
-      throw new Error(
-        `No transition from state ${this.state.toString()} on ${inputSymbol.toString()}`,
-      );
-    }
-    this._state = transition.nextState;
-    return transition;
-  }
-
-  reset(state: State[keyof State]) {
-    this._state = state;
-  }
-}
+import { JSONChunk } from "~/lib/domain/chunk";
+import { FSMTransition, type Lexer } from "~/lib/domain/lexer";
+import type { JSONTokenType } from "~/lib/domain/lexer";
+import type { JSONValue } from "~/lib/domain/lexer";
+import type { JSONTransition } from "./transitions";
 
 export class DPDATransition<State, Input, Stack> extends FSMTransition<
   State,
@@ -82,6 +25,7 @@ export abstract class DPDA<
   Stack extends Record<string, string | number | symbol>,
 > {
   private _state: State[keyof State];
+  protected readonly stack: Array<Stack[keyof Stack]> = [];
   private readonly transitions: Map<
     State[keyof State],
     Map<
@@ -96,7 +40,6 @@ export abstract class DPDA<
       >
     >
   > = new Map();
-  private readonly stack: Array<Stack[keyof Stack]> = [];
 
   constructor(
     transitions: Array<
@@ -130,10 +73,6 @@ export abstract class DPDA<
     return this._state;
   }
 
-  get stackDepth(): number {
-    return this.stack.length;
-  }
-
   transition(
     inputSymbol: Input[keyof Input],
   ): DPDATransition<
@@ -163,5 +102,51 @@ export abstract class DPDA<
     this.stack.push(...transition.stackPush);
 
     return transition;
+  }
+}
+
+/**
+ * Parser passes chunk to Lexer. Lexer returns tokens. Parser parses the tokens;
+ * maintaining Object and Array metadata, and returning primitives with
+ * metadata. E.g. ["key", 0, "key"], and "string...".
+ */
+/**
+ * A JSON parser that consumes LexerTokens and produces JSONValues. The primary
+ * concern of JSONParserUseCase is to maintain nesting metadata from the JSON
+ * stream.
+ */
+export class JSONParser extends DPDA<
+  typeof JSONTokenType,
+  typeof JSONTokenType,
+  typeof JSONValue
+> {
+  private lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>;
+  private path: Array<string | number> = [];
+
+  /**
+   * Creates a JSON parser.
+   * @param {Lexer} lexer The lexer instance used for tokenization.
+   * @param {Array<JSONTransition>} transitions The transitions used for parsing.
+   * @param {JSONTokenType} initialState The initial state of the parser.
+   * @param {Array<JSONTokenType>} initialStack The initial stack of the parser.
+   */
+  constructor(
+    lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>,
+    transitions: Array<JSONTransition>,
+    initialState: JSONTokenType,
+    initialStack: Array<JSONValue>,
+  ) {
+    super(transitions, initialState, initialStack);
+    this.lexer = lexer;
+  }
+
+  async *parse(chunk: string): AsyncGenerator<JSONChunk> {
+    const tokens = this.lexer.tokenise(chunk);
+
+    // TODO: Manage depth state using dpda
+    for await (const token of tokens) {
+      this.transition(token.type);
+      yield new JSONChunk(token.lexeme, token.type, [...this.path]);
+    }
   }
 }

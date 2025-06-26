@@ -1,61 +1,14 @@
-import {
-  JSONParserUseCase,
-  JSONTokenType,
-  JSONTransitions,
-  JSONValue,
-} from "~/lib/application/parser";
-import { Lexer } from "~/lib/domain/lexer";
-import { DPDA, FSM } from "~/lib/domain/state";
-import { StreamProcessorFactory } from "~/lib/domain/stream-adapter";
+import { JSONTokenType, JSONValue } from "~/lib/domain/lexer";
+import { JSONLexer } from "~/lib/domain/lexer";
+import { JSONParser } from "~/lib/domain/parser";
+import { StreamProcessorFactory } from "~/lib/infrastructure/stream-adapter";
+import { JSONTransitions } from "./lib/domain/transitions";
 
 /**
  * TODO
  * - [ ] Emit error event for unexpected JSONTokenType, e.g. JSONTokenType.Comma when waiting for a value inside an JSONState.Object
  * - [ ] Replace template literal with nested map for transition lookup
  */
-
-class JSONFSM extends FSM<typeof JSONTokenType, typeof JSONTokenType> {}
-class JSONDPDA extends DPDA<
-  typeof JSONTokenType,
-  typeof JSONTokenType,
-  typeof JSONValue
-> {}
-
-export class JSONLexer extends Lexer<
-  typeof JSONTokenType,
-  typeof JSONTokenType
-> {
-  private isEscaped = false;
-  private buffer = "";
-
-  public async *tokenise(chunk: string) {
-    const tokens = this.yieldToken(chunk);
-    for (const token of tokens) {
-      switch (token.type) {
-        case JSONTokenType.Escape:
-          // biome-ignore  lint/suspicious/noFallthroughSwitchClause: DRY
-          // this.buffer += token.lexeme;
-          this.isEscaped = true;
-        case JSONTokenType.Number:
-        case JSONTokenType.True:
-        case JSONTokenType.False:
-        case JSONTokenType.Null:
-          this.buffer += token.lexeme;
-          continue;
-      }
-
-      if (this.buffer.length > 0) {
-        token.lexeme = this.buffer + token.lexeme;
-        this.buffer = "";
-      }
-      if (this.isEscaped) {
-        this.isEscaped = false;
-      }
-
-      yield token;
-    }
-  }
-}
 
 export function parseStream(
   stream:
@@ -64,14 +17,17 @@ export function parseStream(
     | WebSocket
     | AsyncIterable<string | Uint8Array | ArrayBuffer>,
 ): void {
-  const fsm = new JSONFSM(JSONTransitions, JSONTokenType.Whitespace);
-  const lexer = new JSONLexer(JSONTokenType, JSONTransitions, fsm);
-  const dpda = new JSONDPDA(
+  const lexer = new JSONLexer(
+    JSONTokenType,
     JSONTransitions,
     JSONTokenType.Whitespace,
-    JSONValue.None,
   );
-  const parser = new JSONParserUseCase(lexer, dpda);
+  const parser = new JSONParser(
+    lexer,
+    JSONTransitions,
+    JSONTokenType.Whitespace,
+    [JSONValue.None],
+  );
 
   const processor = StreamProcessorFactory.create(stream);
   throw new Error("parseStream not yet implemented");

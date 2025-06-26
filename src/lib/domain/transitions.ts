@@ -1,131 +1,7 @@
-/**
- * Parser passes chunk to Lexer. Lexer returns tokens. Parser parses the tokens;
- * maintaining Object and Array metadata, and returning primitives with
- * metadata. E.g. ["key", 0, "key"], and "string...".
- */
-import type { Lexer } from "~/lib/domain/lexer";
-import { type DPDA, DPDATransition } from "~/lib/domain/state";
+import { JSONTokenType, JSONValue } from "~/lib/domain/lexer";
+import { DPDATransition } from "./parser";
 
-export enum JSONValue {
-  None = "none",
-  Object = "object",
-  Array = "array",
-  String = "string",
-  Number = "number",
-  True = "true",
-  False = "false",
-  Null = "null",
-}
-
-/**
- * | Token type   | Delimiter             | Description              |
- * | ------------ | --------------------- | ------------------------ |
- * | `LBRACE`     | `{`                   | Start of an object       |
- * | `RBRACE`     | `}`                   | End of an object         |
- * | `LBRACKET`   | `[`                   | Start of an array        |
- * | `RBRACKET`   | `]`                   | End of an array          |
- * | `COLON`      | `:`                   | Key-value separator      |
- * | `COMMA`      | `,`                   | Member/element separator |
- * | `STRING`     | `"`                   | Start/end of a string    |
- * | `NUMBER`     | `-`, `1`, `2`, etc.   | Integer or float         |
- * | `TRUE`       | `true`                | True literal             |
- * | `FALSE`      | `false`               | False literal            |
- * | `NULL`       | `null`                | Null literal             |
- * | `ESCAPE`     | `\`                   | Escape character         |
- * | `WHITESPACE` | ` `, `\t`, `\n`, `\r` | Whitespace               |
- *
- * @enum {symbol}
- */
-export const JSONTokenType = {
-  LBrace: Symbol("{"),
-  RBrace: Symbol("}"),
-  LBracket: Symbol("["),
-  RBracket: Symbol("]"),
-  Colon: Symbol(":"),
-  Comma: Symbol(","),
-  String: Symbol('"'),
-  Number: Symbol("-0123456789"),
-  True: Symbol("t"),
-  False: Symbol("f"),
-  Null: Symbol("n"),
-  Escape: Symbol("\\"),
-  Whitespace: Symbol(" \t\n\r"),
-} as const;
-export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
-
-class JSONChunk {
-  constructor(
-    private _value: string,
-    private _type: JSONTokenType,
-    private _segments: Array<string | number>,
-  ) {}
-
-  get value(): string {
-    return this._value;
-  }
-
-  get type(): JSONTokenType {
-    return this._type;
-  }
-
-  public pointer(path: Array<string | number>): string {
-    return `/${path
-      .map((s) => String(s).replace(/~/g, "~0").replace(/\//g, "~1"))
-      .join("/")}`;
-  }
-
-  private path(path: Array<string | number>): string {
-    return `$${path
-      .map((s) => (typeof s === "number" ? `[${s}]` : `.${s}`))
-      .join("")}`;
-  }
-
-  get segments(): Array<string | number> {
-    return [...this._segments];
-  }
-}
-
-/**
- * A JSON parser that consumes LexerTokens and produces JSONValues. The primary
- * concern of JSONParserUseCase is to maintain nesting metadata from the JSON
- * stream.
- */
-export class JSONParserUseCase {
-  private lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>;
-  private dpda: DPDA<
-    typeof JSONTokenType,
-    typeof JSONTokenType,
-    typeof JSONValue
-  >;
-  private path: Array<string | number> = [];
-
-  /**
-   * Creates a JSON parser.
-   * @param {Lexer} lexer The lexer instance used for tokenization.
-   * @param {DPDA} dpda The DPDA instance used for parsing.
-   */
-  constructor(
-    lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>,
-    dpda: DPDA<typeof JSONTokenType, typeof JSONTokenType, typeof JSONValue>,
-  ) {
-    this.lexer = lexer;
-    this.dpda = dpda;
-  }
-
-  async *parse(chunk: string): AsyncGenerator<JSONChunk> {
-    const tokens = this.lexer.tokenise(chunk);
-
-    // TODO: Manage depth state using dpda
-    for await (const token of tokens) {
-      if (Object.values(JSONTokenType).includes(token.type)) {
-        this.dpda.transition(token.type);
-      }
-      yield new JSONChunk(token.lexeme, token.type, [...this.path]);
-    }
-  }
-}
-
-class JSONTransition extends DPDATransition<
+export class JSONTransition extends DPDATransition<
   JSONTokenType,
   JSONTokenType,
   JSONValue
@@ -137,9 +13,7 @@ class JSONTransition extends DPDATransition<
  * When currentState is String, and stackTop is String, we have a string value
  * When currentState is Whitespace, and stackTop is Object, we're looking for a value
  */
-const objectTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const objectTransitions: Array<JSONTransition> = [
   // Open object (JSON element is an object)
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -398,9 +272,7 @@ const objectTransitions: Array<
   ),
 ];
 
-const arrayTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const arrayTransitions: Array<JSONTransition> = [
   // Open array (JSON element is an array)
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -626,9 +498,7 @@ const arrayTransitions: Array<
   ),
 ];
 
-const stringTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const stringTransitions: Array<JSONTransition> = [
   // Open string (JSON element is a string)
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -655,9 +525,7 @@ const stringTransitions: Array<
   ),
 ];
 
-const numberTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const numberTransitions: Array<JSONTransition> = [
   // Open number
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -724,9 +592,7 @@ const numberTransitions: Array<
   ),
 ];
 
-const trueTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const trueTransitions: Array<JSONTransition> = [
   // Open true
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -801,9 +667,7 @@ const trueTransitions: Array<
   ),
 ];
 
-const falseTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const falseTransitions: Array<JSONTransition> = [
   // Open false
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -878,9 +742,7 @@ const falseTransitions: Array<
   ),
 ];
 
-const nullTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+const nullTransitions: Array<JSONTransition> = [
   // Open null
   new JSONTransition(
     JSONTokenType.Whitespace, // We're waiting for a value, and
@@ -955,9 +817,7 @@ const nullTransitions: Array<
   ),
 ];
 
-export const JSONTransitions: Array<
-  DPDATransition<JSONTokenType, JSONTokenType, JSONValue>
-> = [
+export const JSONTransitions: Array<JSONTransition> = [
   ...objectTransitions,
   ...arrayTransitions,
   ...stringTransitions,
