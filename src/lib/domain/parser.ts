@@ -1,7 +1,8 @@
+import invariant from "tiny-invariant";
 import { JSONChunk } from "~/lib/domain/chunk";
 import { FSMTransition, type Lexer } from "~/lib/domain/lexer";
-import type { JSONTokenType } from "~/lib/domain/lexer";
-import type { JSONValue } from "~/lib/domain/lexer";
+import { JSONTokenType } from "~/lib/domain/lexer";
+import { JSONValue } from "~/lib/domain/lexer";
 import type { JSONTransition } from "./transitions";
 
 export class DPDATransition<State, Input, Stack> extends FSMTransition<
@@ -140,12 +141,66 @@ export class JSONParser extends DPDA<
     this.lexer = lexer;
   }
 
+  /**
+   * Buffers the current key until it has been streamed to completion.
+   * @private
+   */
+  private keyBuffer = "";
+
+  /**
+   * Parses a chunk of JSON data from a stream.
+   * @param {string} chunk A chunk of JSON data to parse.
+   * @generator
+   */
   async *parse(chunk: string): AsyncGenerator<JSONChunk> {
     const tokens = this.lexer.tokenise(chunk);
 
-    // TODO: Manage depth state using dpda
     for await (const token of tokens) {
-      this.transition(token.type);
+      if (token.symbol) {
+        const transition = this.transition(token.symbol);
+
+        if (this.stack.length > this.path.length) {
+          if (transition.stackTop === JSONValue.Array) {
+            this.path.push(0);
+            continue;
+          }
+          if (transition.stackTop === JSONValue.Object) {
+            this.path.push("");
+            continue;
+          }
+        }
+
+        if (this.stack.length < this.path.length) {
+          this.path.pop();
+          continue;
+        }
+
+        // Handle array element transitions
+        if (
+          transition.stackTop === JSONValue.Array &&
+          transition.inputSymbol === JSONTokenType.Comma
+        ) {
+          this.path[this.path.length - 1] += 1;
+        }
+
+        if (
+          transition.stackTop === JSONValue.Object &&
+          transition.currentState === JSONTokenType.String
+        ) {
+          this.keyBuffer += token.lexeme;
+          continue;
+        }
+
+        if (
+          transition.stackTop === JSONValue.Object &&
+          transition.currentState === JSONTokenType.String &&
+          transition.inputSymbol === JSONTokenType.String
+        ) {
+          this.path[this.path.length - 1] = this.keyBuffer;
+          this.keyBuffer = "";
+        }
+      }
+
       yield new JSONChunk(token.lexeme, token.type, [...this.path]);
     }
   }

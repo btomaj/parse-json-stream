@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DPDA, DPDATransition } from "~/lib/domain/parser";
+import { JSONChunk } from "~/lib/domain/chunk";
+import {
+  JSONTokenType,
+  JSONValue,
+  Lexer,
+  type LexerToken,
+} from "~/lib/domain/lexer";
+import { DPDA, DPDATransition, JSONParser } from "~/lib/domain/parser";
+import { JSONTransitions } from "~/lib/domain/transitions";
 
 describe("DPDA", () => {
   enum TestState {
@@ -146,5 +154,161 @@ describe("DPDA", () => {
     expect(() => dpda.transition(TestInputSymbol.Close)).toThrow(
       `No transition for currentState: ${TestState.Initial}, inputSymbol: ${TestInputSymbol.Close.toString()}, stackTop: ${TestState.Initial}`,
     );
+  });
+});
+
+describe("JSONParser", () => {
+  class FakeLexer extends Lexer<typeof JSONTokenType, typeof JSONTokenType> {
+    returnTokens: Array<LexerToken<typeof JSONTokenType>> = [];
+
+    constructor(
+      states = JSONTokenType,
+      transitions = JSONTransitions,
+      initialState = JSONTokenType.Whitespace,
+    ) {
+      super(states, transitions, initialState);
+    }
+
+    setReturnToken(token: LexerToken<typeof JSONTokenType>) {
+      this.returnTokens.push(token);
+    }
+
+    async *tokenise() {
+      for (const returnToken of this.returnTokens) {
+        yield returnToken;
+      }
+    }
+  }
+
+  it("should initialise to initial state", () => {
+    const parser = new JSONParser(
+      new FakeLexer(),
+      JSONTransitions,
+      JSONTokenType.Whitespace,
+      [JSONValue.None],
+    );
+    expect(parser.state).toBe(JSONTokenType.Whitespace);
+  });
+
+  it("should return JSONChunk from parse()", async () => {
+    // Arrange
+    const lexer = new FakeLexer();
+    const parser = new JSONParser(
+      lexer,
+      JSONTransitions,
+      JSONTokenType.Whitespace,
+      [JSONValue.None],
+    );
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+
+    // Act
+    const chunks = [];
+    for await (const chunk of parser.parse('"hello"')) {
+      chunks.push(chunk);
+    }
+
+    // Assert
+    expect(chunks[0]).toBeInstanceOf(JSONChunk);
+  });
+
+  it("should set and increment array index", async () => {
+    // Arrange
+    const lexer = new FakeLexer();
+    lexer.setReturnToken({ type: JSONTokenType.LBracket, lexeme: "[" });
+    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
+    lexer.setReturnToken({ type: JSONTokenType.Comma, lexeme: "," });
+    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "2" });
+    lexer.setReturnToken({ type: JSONTokenType.RBracket, lexeme: "]" });
+    const parser = new JSONParser(
+      lexer,
+      JSONTransitions,
+      JSONTokenType.Whitespace,
+      [JSONValue.None],
+    );
+
+    // Act
+    const chunks = [];
+    for await (const chunk of parser.parse("[1,2]")) {
+      chunks.push(chunk);
+    }
+
+    // Assert
+    expect(chunks[0].segments).toEqual(["0"]);
+    expect(chunks[1].segments).toEqual(["0"]);
+    expect(chunks[2].segments).toEqual(["1"]);
+    expect(chunks[3].segments).toEqual(["1"]);
+    expect(chunks[4].segments).toEqual([]);
+  });
+
+  it("should set object key", async () => {
+    // Arrange
+    const lexer = new FakeLexer();
+    lexer.setReturnToken({ type: JSONTokenType.LBrace, lexeme: "{" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "key" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.Colon, lexeme: ":" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "value" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.RBrace, lexeme: "}" });
+    const parser = new JSONParser(
+      lexer,
+      JSONTransitions,
+      JSONTokenType.Whitespace,
+      [JSONValue.None],
+    );
+
+    // Act
+    const chunks = [];
+    for await (const chunk of parser.parse('{"key":"value"}')) {
+      chunks.push(chunk);
+    }
+
+    // Assert
+    expect(chunks[2].segments).toEqual([]);
+    expect(chunks[3].segments).toEqual(["key"]);
+    expect(chunks[5].segments).toEqual(["key"]);
+    expect(chunks[6].segments).toEqual(["key"]);
+    expect(chunks[7].segments).toEqual(["key"]);
+    expect(chunks[8].segments).toEqual([]);
+  });
+
+  it("should remove path segments when nesting shrinks", async () => {
+    // Arrange
+    const lexer = new FakeLexer();
+    lexer.setReturnToken({ type: JSONTokenType.LBrace, lexeme: "{" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "key" });
+    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    lexer.setReturnToken({ type: JSONTokenType.Colon, lexeme: ":" });
+    lexer.setReturnToken({ type: JSONTokenType.LBracket, lexeme: "[" });
+    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
+    lexer.setReturnToken({ type: JSONTokenType.Comma, lexeme: "," });
+    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
+    lexer.setReturnToken({ type: JSONTokenType.RBracket, lexeme: "]" });
+    lexer.setReturnToken({ type: JSONTokenType.RBrace, lexeme: "}" });
+    const parser = new JSONParser(
+      lexer,
+      JSONTransitions,
+      JSONTokenType.Whitespace,
+      [JSONValue.None],
+    );
+
+    // Act
+    const chunks = [];
+    for await (const chunk of parser.parse('{"key":[1,1]}')) {
+      chunks.push(chunk);
+    }
+
+    // Assert
+    expect(chunks[2].segments).toEqual([]);
+    expect(chunks[3].segments).toEqual(["key"]);
+    expect(chunks[5].segments).toEqual(["key", 0]);
+    expect(chunks[6].segments).toEqual(["key", 0]);
+    expect(chunks[7].segments).toEqual(["key", 1]);
+    expect(chunks[8].segments).toEqual(["key", 1]);
+    expect(chunks[9].segments).toEqual(["key"]);
+    expect(chunks[10].segments).toEqual([]);
   });
 });

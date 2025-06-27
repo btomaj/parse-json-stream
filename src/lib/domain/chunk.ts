@@ -191,7 +191,7 @@ export class JSONChunk {
     for (let i = 0; i < len; i++) {
       const segment = segments[i];
       if (typeof segment === "number") {
-        result += "[" + segment + "]";
+        result += `[${segment}]`;
       } else {
         if (this.needsBracketNotation(segment)) {
           result += "['";
@@ -208,7 +208,7 @@ export class JSONChunk {
           }
           result += "']";
         } else {
-          result += "." + segment;
+          result += `.${segment}`;
         }
       }
     }
