@@ -128,7 +128,9 @@ describe("Abstract Lexer", () => {
       super(states, transitions, initialState);
     }
 
-    public async *tokenise(): AsyncGenerator<LexerToken<typeof TestState>> {}
+    public async *tokenise(): AsyncGenerator<
+      LexerToken<typeof TestState, typeof TestTokenType>
+    > {}
 
     // Expose protected methods for testing
     public testYieldToken(chunk: string) {

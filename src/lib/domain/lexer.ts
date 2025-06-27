@@ -47,9 +47,10 @@ export const JSONTokenType = {
 } as const;
 export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
 
-export interface LexerToken<TokenType> {
-  type: TokenType[keyof TokenType];
+export interface LexerToken<State, Input> {
+  type: State[keyof State];
   lexeme: string;
+  symbol?: Input[keyof Input];
 }
 
 export class FSMTransition<State, Input> {
@@ -136,7 +137,7 @@ export abstract class Lexer<
     super(transitions, initialState);
 
     this.stateBitFlags = this.createStateBitFlags(states);
-    this.unicodeCharacterBitMask = this.createStateTokenTypeBitMask(
+    this.unicodeCharacterBitMask = this.createStateSymbolBitMask(
       this.stateBitFlags,
       transitions,
     );
@@ -161,28 +162,26 @@ export abstract class Lexer<
     return stateBitFlags;
   }
 
-  private createStateTokenTypeBitMask(
+  private createStateSymbolBitMask(
     stateBitFlags: Record<State[keyof State], number>,
-    stateTokenTypeMaps: Array<
-      FSMTransition<State[keyof State], Input[keyof Input]>
-    >,
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
   ): Uint8Array | Uint16Array | Uint32Array {
-    let tokenTypeBitmask: Uint8Array | Uint16Array | Uint32Array;
+    let symbolBitmask: Uint8Array | Uint16Array | Uint32Array;
     const numberOfStates = Object.keys(stateBitFlags).length;
     if (numberOfStates <= 8) {
-      tokenTypeBitmask = new Uint8Array(128);
+      symbolBitmask = new Uint8Array(128);
     } else if (numberOfStates <= 16) {
-      tokenTypeBitmask = new Uint16Array(128);
+      symbolBitmask = new Uint16Array(128);
     } else if (numberOfStates <= 32) {
-      tokenTypeBitmask = new Uint32Array(128);
+      symbolBitmask = new Uint32Array(128);
     } else {
       throw new Error(
         "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
       );
     }
 
-    for (const stateTokenTypeMap of stateTokenTypeMaps) {
-      const lexicalRule = stateTokenTypeMap.inputSymbol;
+    for (const transition of transitions) {
+      const lexicalRule = transition.inputSymbol;
       let characters: string;
       if (typeof lexicalRule === "symbol") {
         if (typeof lexicalRule.description === "undefined") {
@@ -199,16 +198,15 @@ export abstract class Lexer<
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
-        tokenTypeBitmask[unicode] |=
-          stateBitFlags[stateTokenTypeMap.currentState];
-        this.unicodeCharacterMap[unicode] = stateTokenTypeMap.inputSymbol;
+        symbolBitmask[unicode] |= stateBitFlags[transition.currentState];
+        this.unicodeCharacterMap[unicode] = transition.inputSymbol;
       }
     }
 
-    return tokenTypeBitmask;
+    return symbolBitmask;
   }
 
-  private findFirstTokenTypeForState(
+  private findFirstSymbolForState(
     chunk: string,
   ): [number, Input[keyof Input] | null] {
     for (let i = 0; i < chunk.length; i++) {
@@ -223,9 +221,9 @@ export abstract class Lexer<
     return [-1, null];
   }
 
-  protected *yieldToken(chunk: string): Generator<LexerToken<State>> {
+  protected *yieldToken(chunk: string): Generator<LexerToken<State, Input>> {
     while (chunk.length > 0) {
-      const [index, tokenType] = this.findFirstTokenTypeForState(chunk);
+      const [index, symbol] = this.findFirstSymbolForState(chunk);
       // if there is no lexeme in the chunk, emit the chunk
       if (index < 0) {
         yield { type: this.state, lexeme: chunk };
@@ -233,7 +231,7 @@ export abstract class Lexer<
       }
       // else there is a lexeme in the chunk
       invariant(
-        tokenType,
+        symbol,
         "findFirstTokenType found token, but type property of token is null",
       );
       // if the lexeme is not the first character in the chunk, emit everything up to (not including) the lexeme
@@ -241,8 +239,8 @@ export abstract class Lexer<
         yield { type: this.state, lexeme: chunk.slice(0, index) };
       }
 
-      this.transition(tokenType);
-      yield { type: this.state, lexeme: chunk.slice(index, index + 1) };
+      this.transition(symbol);
+      yield { type: this.state, lexeme: chunk.slice(index, index + 1), symbol };
 
       // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
       // biome-ignore lint/style/noParameterAssign:
@@ -256,7 +254,7 @@ export abstract class Lexer<
    * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk.
    * @param {string} chunk A chunk to interpret.
    */
-  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<State>>;
+  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<State, Input>>;
 }
 
 export class JSONLexer extends Lexer<
