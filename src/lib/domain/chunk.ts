@@ -1,4 +1,4 @@
-import type { JSONTokenType } from "./lexer";
+import type { JSONValue } from "./lexer";
 
 export class JSONChunk {
   private static readonly SPECIAL_CHARS_BITMAP = new Uint8Array([
@@ -143,7 +143,7 @@ export class JSONChunk {
 
   constructor(
     private readonly _value: string,
-    private readonly _type: JSONTokenType,
+    private readonly _type: JSONValue,
     private readonly _segments: ReadonlyArray<string | number>,
   ) {}
 
@@ -151,7 +151,7 @@ export class JSONChunk {
     return this._value;
   }
 
-  get type(): JSONTokenType {
+  get type(): JSONValue {
     return this._type;
   }
 

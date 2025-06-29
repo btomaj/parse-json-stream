@@ -21,7 +21,6 @@ describe("DPDA", () => {
     Close: Symbol(")"),
     End: Symbol("$"),
   } as const;
-  type TestInputSymbol = (typeof TestInputSymbol)[keyof typeof TestInputSymbol];
 
   const testTransitions = [
     // From bottom marker: push open paren marker on open paren
@@ -158,22 +157,23 @@ describe("DPDA", () => {
 });
 
 describe("JSONParser", () => {
-  class FakeLexer extends Lexer<typeof JSONTokenType, typeof JSONTokenType> {
-    returnTokens: Array<LexerToken<typeof JSONTokenType>> = [];
+  class FakeLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
+    returnTokens: Array<LexerToken<typeof JSONValue, typeof JSONTokenType>> =
+      [];
 
     constructor(
-      states = JSONTokenType,
+      states = JSONValue,
       transitions = JSONTransitions,
-      initialState = JSONTokenType.Whitespace,
+      initialState = JSONValue.None,
     ) {
       super(states, transitions, initialState);
     }
 
-    setReturnToken(token: LexerToken<typeof JSONTokenType>) {
+    setReturnToken(token: LexerToken<typeof JSONValue, typeof JSONTokenType>) {
       this.returnTokens.push(token);
     }
 
-    async *tokenise() {
+    *tokenise() {
       for (const returnToken of this.returnTokens) {
         yield returnToken;
       }
@@ -184,22 +184,19 @@ describe("JSONParser", () => {
     const parser = new JSONParser(
       new FakeLexer(),
       JSONTransitions,
-      JSONTokenType.Whitespace,
+      JSONValue.None,
       [JSONValue.None],
     );
-    expect(parser.state).toBe(JSONTokenType.Whitespace);
+    expect(parser.state).toBe(JSONValue.None);
   });
 
   it("should return JSONChunk from parse()", async () => {
     // Arrange
     const lexer = new FakeLexer();
-    const parser = new JSONParser(
-      lexer,
-      JSONTransitions,
-      JSONTokenType.Whitespace,
-      [JSONValue.None],
-    );
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
+    const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
+      JSONValue.None,
+    ]);
+    lexer.setReturnToken({ type: JSONValue.String, lexeme: '"' });
 
     // Act
     const chunks = [];
@@ -214,17 +211,26 @@ describe("JSONParser", () => {
   it("should set and increment array index", async () => {
     // Arrange
     const lexer = new FakeLexer();
-    lexer.setReturnToken({ type: JSONTokenType.LBracket, lexeme: "[" });
-    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
-    lexer.setReturnToken({ type: JSONTokenType.Comma, lexeme: "," });
-    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "2" });
-    lexer.setReturnToken({ type: JSONTokenType.RBracket, lexeme: "]" });
-    const parser = new JSONParser(
-      lexer,
-      JSONTransitions,
-      JSONTokenType.Whitespace,
-      [JSONValue.None],
-    );
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.LBracket,
+      lexeme: "[",
+    });
+    lexer.setReturnToken({ type: JSONValue.Number, lexeme: "1" });
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.Comma,
+      lexeme: ",",
+    });
+    lexer.setReturnToken({ type: JSONValue.Number, lexeme: "2" });
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.RBracket,
+      lexeme: "]",
+    });
+    const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
+      JSONValue.None,
+    ]);
 
     // Act
     const chunks = [];
@@ -243,21 +249,46 @@ describe("JSONParser", () => {
   it("should set object key", async () => {
     // Arrange
     const lexer = new FakeLexer();
-    lexer.setReturnToken({ type: JSONTokenType.LBrace, lexeme: "{" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "key" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.Colon, lexeme: ":" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "value" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.RBrace, lexeme: "}" });
-    const parser = new JSONParser(
-      lexer,
-      JSONTransitions,
-      JSONTokenType.Whitespace,
-      [JSONValue.None],
-    );
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.LBrace,
+      lexeme: "{",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({ type: JSONValue.String, lexeme: "key" });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.Colon,
+      lexeme: ":",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({ type: JSONValue.String, lexeme: "value" });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.RBrace,
+      lexeme: "}",
+    });
+    const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
+      JSONValue.None,
+    ]);
 
     // Act
     const chunks = [];
@@ -277,23 +308,64 @@ describe("JSONParser", () => {
   it("should remove path segments when nesting shrinks", async () => {
     // Arrange
     const lexer = new FakeLexer();
-    lexer.setReturnToken({ type: JSONTokenType.LBrace, lexeme: "{" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: "key" });
-    lexer.setReturnToken({ type: JSONTokenType.String, lexeme: '"' });
-    lexer.setReturnToken({ type: JSONTokenType.Colon, lexeme: ":" });
-    lexer.setReturnToken({ type: JSONTokenType.LBracket, lexeme: "[" });
-    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
-    lexer.setReturnToken({ type: JSONTokenType.Comma, lexeme: "," });
-    lexer.setReturnToken({ type: JSONTokenType.Number, lexeme: "1" });
-    lexer.setReturnToken({ type: JSONTokenType.RBracket, lexeme: "]" });
-    lexer.setReturnToken({ type: JSONTokenType.RBrace, lexeme: "}" });
-    const parser = new JSONParser(
-      lexer,
-      JSONTransitions,
-      JSONTokenType.Whitespace,
-      [JSONValue.None],
-    );
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.LBrace,
+      lexeme: "{",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: "key",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      symbol: JSONTokenType.String,
+      lexeme: '"',
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.Colon,
+      lexeme: ":",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.LBracket,
+      lexeme: "[",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Number,
+      symbol: JSONTokenType.Number,
+      lexeme: "1",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.Comma,
+      lexeme: ",",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Number,
+      symbol: JSONTokenType.Number,
+      lexeme: "1",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Array,
+      symbol: JSONTokenType.RBracket,
+      lexeme: "]",
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONTokenType.RBrace,
+      lexeme: "}",
+    });
+    const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
+      JSONValue.None,
+    ]);
 
     // Act
     const chunks = [];

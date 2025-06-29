@@ -1,5 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { FSM, FSMTransition, Lexer, type LexerToken } from "~/lib/domain/lexer";
+import { describe, expect, it } from "vitest";
+import {
+  FSM,
+  FSMTransition,
+  JSONLexer,
+  JSONValue,
+  Lexer,
+  type LexerToken,
+} from "~/lib/domain/lexer";
+import { JSONTransitions } from "~/lib/domain/transitions";
 
 describe("FSM", () => {
   enum TestState {
@@ -13,8 +21,7 @@ describe("FSM", () => {
     Zero: Symbol("0"),
     One: Symbol("1"),
     Two: Symbol("2"),
-  };
-  type TestInputSymbol = (typeof TestInputSymbol)[keyof typeof TestInputSymbol];
+  } as const;
 
   const testTransitions = [
     new FSMTransition(TestState.Initial, TestInputSymbol.Zero, TestState.A),
@@ -84,8 +91,7 @@ describe("Abstract Lexer", () => {
     Special: Symbol("!@#$%^&*()_+=[]{}|:./<>?`~"),
     Delimiter: ";,",
     Quote: "'\"",
-  };
-  type TestTokenType = (typeof TestTokenType)[keyof typeof TestTokenType];
+  } as const;
 
   const testTransitions = [
     new FSMTransition(
@@ -110,15 +116,6 @@ describe("Abstract Lexer", () => {
     ),
   ];
 
-  class TestFSM extends FSM<typeof TestState, typeof TestTokenType> {
-    constructor(
-      transitions = testTransitions,
-      initialState = TestState.Initial,
-    ) {
-      super(transitions, initialState);
-    }
-  }
-
   class TestLexer extends Lexer<typeof TestState, typeof TestTokenType> {
     constructor(
       states = TestState,
@@ -128,7 +125,7 @@ describe("Abstract Lexer", () => {
       super(states, transitions, initialState);
     }
 
-    public async *tokenise(): AsyncGenerator<
+    public *tokenise(): Generator<
       LexerToken<typeof TestState, typeof TestTokenType>
     > {}
 
@@ -218,7 +215,7 @@ describe("Abstract Lexer", () => {
     const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
-    const tokens = lexer.testYieldToken("abc");
+    lexer.testYieldToken("abc");
 
     // Assert
     expect(lexer.state).toBe(TestState.Initial);
@@ -229,7 +226,7 @@ describe("Abstract Lexer", () => {
     const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
-    const tokens = lexer.testYieldToken("1abc");
+    lexer.testYieldToken("1abc");
 
     // Assert
     expect(lexer.state).toBe(TestState.Numbers);
@@ -240,9 +237,213 @@ describe("Abstract Lexer", () => {
     const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
 
     // Act
-    const tokens = lexer.testYieldToken("1!");
+    lexer.testYieldToken("1!");
 
     // Assert
     expect(lexer.state).toBe(TestState.Special);
+  });
+});
+
+describe("JSONLexer", () => {
+  it("should initialize with correct state", () => {
+    // Arrange & Act
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+
+    // Assert
+    expect(lexer.state).toBe(JSONValue.None);
+  });
+
+  it.for([
+    ["{}", ["{", "}"]],
+    ["{:}", ["{", ":", "}"]],
+    ['{"key"}', ["{", '"', "key", '"', "}"]],
+    ["{,}", ["{", ",", "}"]],
+    ['{"key":{}}', ["{", '"', "key", '"', ":", "{", "}", "}"]],
+    ['{"key":[]}', ["{", '"', "key", '"', ":", "[", "]", "}"]],
+    ['{"key":"string"}', ["{", '"', "key", '"', ":", '"', "string", '"', "}"]],
+    ['{"key":3.2e1}', ["{", '"', "key", '"', ":", "3.2e1", "}"]],
+    ['{"key":-3.2e1}', ["{", '"', "key", '"', ":", "-3.2e1", "}"]],
+    ['{"key":3.2e1,}', ["{", '"', "key", '"', ":", "3.2e1", ",", "}"]],
+    ['{"key":-3.2e1,}', ["{", '"', "key", '"', ":", "-3.2e1", ",", "}"]],
+    ['{"key":true}', ["{", '"', "key", '"', ":", "true", "}"]],
+    ['{"key":true,}', ["{", '"', "key", '"', ":", "true", ",", "}"]],
+    ['{"key":false}', ["{", '"', "key", '"', ":", "false", "}"]],
+    ['{"key":false,}', ["{", '"', "key", '"', ":", "false", ",", "}"]],
+    ['{"key":null}', ["{", '"', "key", '"', ":", "null", "}"]],
+    ['{"key":null,}', ["{", '"', "key", '"', ":", "null", ",", "}"]],
+  ])("should correctly tokenise object transition %s", ([chunk, expected]) => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+
+    // Act
+    const tokens = Array.from(lexer.tokenise(chunk as string)).map(
+      (token) => token.lexeme,
+    );
+
+    // Assert
+    expect(tokens).toEqual(expected);
+  });
+
+  it.for([
+    ["[]", ["[", "]"]],
+    ["[,]", ["[", ",", "]"]],
+    ["[[]]", ["[", "[", "]", "]"]],
+    ["[{}]", ["[", "{", "}", "]"]],
+    ['["string"]', ["[", '"', "string", '"', "]"]],
+    ["[3.2e1]", ["[", "3.2e1", "]"]],
+    ["[-3.2e1]", ["[", "-3.2e1", "]"]],
+    ["[true]", ["[", "true", "]"]],
+    ["[false]", ["[", "false", "]"]],
+    ["[null]", ["[", "null", "]"]],
+  ])("should correctly tokenise array transition %s", ([chunk, expected]) => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+
+    // Act
+    const tokens = Array.from(lexer.tokenise(chunk as string)).map(
+      (token) => token.lexeme,
+    );
+
+    // Assert
+    expect(tokens).toEqual(expected);
+  });
+
+  it.for([
+    [" ", [" "]],
+    ["{}", ["{", "}"]],
+    ["[]", ["[", "]"]],
+    ['""', ['"', '"']],
+    ["1.2e-3", ["1.2e-3"]],
+    ["-1.2E-3", ["-1.2E-3"]],
+    ["true", ["true"]],
+    ["false", ["false"]],
+    ["null", ["null"]],
+  ])(
+    "should correctly tokenise string followed by %s",
+    ([addendum, expected]) => {
+      // Arrange
+      const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+      const string = ['"', "string", '"'];
+      (expected as Array<string>).unshift(...string);
+
+      // Act
+      const tokens = Array.from(lexer.tokenise(string.join("") + addendum)).map(
+        (token) => token.lexeme,
+      );
+
+      // Assert
+      expect(tokens).toEqual(expected);
+    },
+  );
+
+  it.for([
+    [" "],
+    ["{}"],
+    ["[]"],
+    ['\\"'],
+    ["\\\\"],
+    ["\\/"],
+    ["1.2e-3"],
+    ["-1.2E-3"],
+    ["true"],
+    ["false"],
+    ["null"],
+  ])("should correctly tokenise string containing %s", ([addendum]) => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const expected = ['"', `str${addendum}ing`, '"'];
+
+    // Act
+    const tokens = Array.from(lexer.tokenise(expected.join(""))).map(
+      (token) => token.lexeme,
+    );
+
+    // Assert
+    expect(tokens).toEqual(expected);
+  });
+
+  describe.for([
+    ["321"],
+    ["-321"],
+    ["3.21"],
+    ["-3.21"],
+    ["3e1"],
+    ["-3e1"],
+    ["3e-1"],
+    ["-3e-1"],
+    ["3E1"],
+    ["-3E1"],
+    ["3E-1"],
+    ["-3E-1"],
+    ["3.2e1"],
+    ["-3.2e1"],
+    ["3.2e-1"],
+    ["-3.2e-1"],
+    ["3.2e1"],
+    ["-3.2e1"],
+    ["3.2e-1"],
+    ["-3.2e-1"],
+  ])("should correctly tokenise number %s", ([number]) => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    it.for([
+      [" ", [number, " "]],
+      ["{}", [number, "{", "}"]],
+      ["[]", [number, "[", "]"]],
+      ['""', [number, '"', '"']],
+      ["-3.2e-1", [number, "-3.2e-1"]],
+      ["true", [number, "true"]],
+      ["false", [number, "false"]],
+      ["null", [number, "null"]],
+    ])("immediately followed by %s", ([addendum, expected]) => {
+      // Act
+      const tokens = Array.from(lexer.tokenise(number + addendum)).map(
+        (token) => token.lexeme,
+      );
+
+      // Assert
+      expect(tokens).toEqual(expected);
+    });
+  });
+
+  describe.for([["true"], ["false"], ["null"]])(
+    "should correctly tokenise %s",
+    ([primitive]) => {
+      // Arrange
+      const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+      it.for([
+        [" ", [primitive, " "]],
+        ["{}", [primitive, "{", "}"]],
+        ["[]", [primitive, "[", "]"]],
+        ['""', [primitive, '"', '"']],
+        ["1.2e-3", [primitive, "1.2e-3"]],
+        ["-1.2E-3", [primitive, "-1.2E-3"]],
+        ["true", [primitive, "true"]],
+        ["false", [primitive, "false"]],
+        ["null", [primitive, "null"]],
+      ])("immediately followed by %s", ([addendum, expected]) => {
+        // Act
+        const tokens = Array.from(lexer.tokenise(primitive + addendum)).map(
+          (token) => token.lexeme,
+        );
+
+        // Assert
+        expect(tokens).toEqual(expected);
+      });
+    },
+  );
+
+  it("should tokenise whitespace", async () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const expected = " \t\n\r";
+
+    // Act
+    const tokens = Array.from(lexer.tokenise(expected)).map(
+      (token) => token.lexeme,
+    );
+
+    // Assert
+    expect(tokens[0]).toEqual(expected);
   });
 });

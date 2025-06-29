@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { JSONChunk } from "~/lib/domain/chunk";
-import { JSONTokenType } from "~/lib/domain/lexer";
+import { JSONValue } from "~/lib/domain/lexer";
 
 describe("JSONChunk", () => {
   it("should create a JSONChunk", () => {
     // Arrange
     const value = "42";
-    const type = JSONTokenType.Number;
+    const type = JSONValue.Number;
     const segments: ReadonlyArray<string | number> = [];
 
     // Act
@@ -14,7 +14,7 @@ describe("JSONChunk", () => {
 
     // Assert
     expect(chunk.value).toBe("42");
-    expect(chunk.type).toBe(JSONTokenType.Number);
+    expect(chunk.type).toBe(JSONValue.Number);
     expect(chunk.segments).toEqual([]);
     expect(chunk.pointer).toBe("/");
     expect(chunk.path).toBe("$");
@@ -32,7 +32,7 @@ describe("JSONChunk", () => {
     // Arrange & Act
     const chunk = new JSONChunk(
       "",
-      JSONTokenType.String,
+      JSONValue.String,
       segment as Array<string | number>,
     );
 
@@ -67,7 +67,7 @@ describe("JSONChunk", () => {
     "should escape special character '%s' in JSONPath and JSON Pointer",
     ([char, key, path, pointer]) => {
       // Arrange & Act
-      const chunk = new JSONChunk(key, JSONTokenType.String, [key]);
+      const chunk = new JSONChunk(key, JSONValue.String, [key]);
 
       // Assert
       expect(chunk.path).toBe(path);
@@ -77,7 +77,7 @@ describe("JSONChunk", () => {
 
   it("should escape combinations of tilde and slash characters in JSON pointer", () => {
     // Arrange & Act
-    const chunk = new JSONChunk("value", JSONTokenType.String, [
+    const chunk = new JSONChunk("value", JSONValue.String, [
       "key~/with/~tildes",
     ]);
 
@@ -88,7 +88,7 @@ describe("JSONChunk", () => {
 
   it("should handle numerical string segments", () => {
     // Arrange & Act
-    const chunk = new JSONChunk("value", JSONTokenType.String, ["123", "456"]);
+    const chunk = new JSONChunk("value", JSONValue.String, ["123", "456"]);
 
     // Assert
     expect(chunk.path).toBe("$['123']['456']");

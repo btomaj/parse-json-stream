@@ -117,11 +117,11 @@ export abstract class DPDA<
  * stream.
  */
 export class JSONParser extends DPDA<
-  typeof JSONTokenType,
+  typeof JSONValue,
   typeof JSONTokenType,
   typeof JSONValue
 > {
-  private lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>;
+  private lexer: Lexer<typeof JSONValue, typeof JSONTokenType>;
   private path: Array<string | number> = [];
 
   /**
@@ -132,9 +132,9 @@ export class JSONParser extends DPDA<
    * @param {Array<JSONTokenType>} initialStack The initial stack of the parser.
    */
   constructor(
-    lexer: Lexer<typeof JSONTokenType, typeof JSONTokenType>,
+    lexer: Lexer<typeof JSONValue, typeof JSONTokenType>,
     transitions: Array<JSONTransition>,
-    initialState: JSONTokenType,
+    initialState: JSONValue,
     initialStack: Array<JSONValue>,
   ) {
     super(transitions, initialState, initialStack);
@@ -185,7 +185,7 @@ export class JSONParser extends DPDA<
 
         if (
           transition.stackTop === JSONValue.Object &&
-          transition.currentState === JSONTokenType.String
+          transition.currentState === JSONValue.String
         ) {
           this.keyBuffer += token.lexeme;
           continue;

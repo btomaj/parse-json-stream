@@ -253,41 +253,60 @@ export abstract class Lexer<
    * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk.
    * @param {string} chunk A chunk to interpret.
    */
-  abstract tokenise(chunk: string): AsyncGenerator<LexerToken<State, Input>>;
+  abstract tokenise(chunk: string): Generator<LexerToken<State, Input>>;
 }
 
-export class JSONLexer extends Lexer<
-  typeof JSONTokenType,
-  typeof JSONTokenType
-> {
-  private isEscaped = false;
-  private buffer = "";
+export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
+  private bufferedToken:
+    | LexerToken<typeof JSONValue, typeof JSONTokenType>
+    | undefined = undefined;
 
-  public async *tokenise(chunk: string) {
+  private static readonly bufferSymbols = new Set<JSONTokenType | undefined>([
+    JSONTokenType.Escape,
+    JSONTokenType.Number,
+    JSONTokenType.True,
+    JSONTokenType.False,
+    JSONTokenType.Null,
+  ]);
+
+  public *tokenise(chunk: string) {
     const tokens = this.yieldToken(chunk);
     for (const token of tokens) {
-      switch (token.type) {
-        case JSONTokenType.Escape:
-          // biome-ignore  lint/suspicious/noFallthroughSwitchClause: DRY
-          // this.buffer += token.lexeme;
-          this.isEscaped = true;
-        case JSONTokenType.Number:
-        case JSONTokenType.True:
-        case JSONTokenType.False:
-        case JSONTokenType.Null:
-          this.buffer += token.lexeme;
-          continue;
+      if (JSONLexer.bufferSymbols.has(token.symbol)) {
+        if (!this.bufferedToken) {
+          // escape, first number, or first character of true, false, or null
+          this.bufferedToken = token;
+        } else {
+          // subsequent number, double escape, or new primitive
+          if (this.bufferedToken.symbol === token.symbol) {
+            this.bufferedToken.lexeme += token.lexeme;
+          } else {
+            yield this.bufferedToken;
+            this.bufferedToken = token;
+          }
+        }
+      } else if (this.bufferedToken) {
+        if (
+          !token.symbol ||
+          this.bufferedToken.symbol === JSONTokenType.Escape
+        ) {
+          this.bufferedToken.lexeme += token.lexeme;
+        }
+        yield this.bufferedToken;
+        this.bufferedToken = undefined;
+        if (
+          token.symbol &&
+          this.bufferedToken.symbol !== JSONTokenType.Escape
+        ) {
+          yield token;
+        }
+      } else {
+        yield token;
       }
+    }
 
-      if (this.buffer.length > 0) {
-        token.lexeme = this.buffer + token.lexeme;
-        this.buffer = "";
-      }
-      if (this.isEscaped) {
-        this.isEscaped = false;
-      }
-
-      yield token;
+    if (this.bufferedToken) {
+      yield this.bufferedToken;
     }
   }
 }
