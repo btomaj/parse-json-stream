@@ -243,7 +243,6 @@ export abstract class Lexer<
       yield { type: this.state, lexeme: chunk.slice(index, index + 1), symbol };
 
       // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
-      // biome-ignore lint/style/noParameterAssign:
       chunk = chunk.slice(index + 1);
     }
   }
