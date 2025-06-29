@@ -232,7 +232,7 @@ export class AsyncIterableProcessor implements StreamProcessor {
   }
 }
 
-// biome-ignore lint/complexity/noStaticOnlyClass:
+// biome-ignore lint/complexity/noStaticOnlyClass: allow
 export class StreamProcessorFactory {
   private static forReadableStream(stream: ReadableStream): StreamProcessor {
     return new ReadableStreamProcessor(stream);

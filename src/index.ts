@@ -1,5 +1,4 @@
-import { JSONTokenType, JSONValue } from "~/lib/domain/lexer";
-import { JSONLexer } from "~/lib/domain/lexer";
+import { JSONLexer, JSONTokenType, JSONValue } from "~/lib/domain/lexer";
 import { JSONParser } from "~/lib/domain/parser";
 import { StreamProcessorFactory } from "~/lib/infrastructure/stream-adapter";
 import { JSONTransitions } from "./lib/domain/transitions";
