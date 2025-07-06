@@ -519,7 +519,7 @@ const stringTransitions: Array<JSONTransition> = [
     JSONTokenType.String, // we find a quotation mark
     JSONValue.None, // without context,
     JSONValue.String, // so the next value is a string, and
-    [JSONValue.None, JSONValue.String], // step inside the string
+    [JSONValue.None, JSONValue.String], // we step inside the string
   ),
   // Close string
   new JSONTransition(
@@ -534,7 +534,7 @@ const stringTransitions: Array<JSONTransition> = [
     JSONValue.String, // Value is a string, and
     JSONTokenType.Escape, // we find an escape character
     JSONValue.String, // inside a string,
-    JSONValue.String, // so the value is still a string, and
+    JSONValue.String, // so the value is still the string, and
     [JSONValue.String], // we stay inside the string
   ),
 ];
