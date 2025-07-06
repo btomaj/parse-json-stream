@@ -12,21 +12,22 @@ export enum JSONValue {
 }
 
 /**
- * | Token type   | Delimiter             | Description              |
- * | ------------ | --------------------- | ------------------------ |
- * | `LBRACE`     | `{`                   | Start of an object       |
- * | `RBRACE`     | `}`                   | End of an object         |
- * | `LBRACKET`   | `[`                   | Start of an array        |
- * | `RBRACKET`   | `]`                   | End of an array          |
- * | `COLON`      | `:`                   | Key-value separator      |
- * | `COMMA`      | `,`                   | Member/element separator |
- * | `STRING`     | `"`                   | Start/end of a string    |
- * | `NUMBER`     | `-`, `1`, `2`, etc.   | Integer or float         |
- * | `TRUE`       | `t`                   | True literal             |
- * | `FALSE`      | `f`                   | False literal            |
- * | `NULL`       | `n`                   | Null literal             |
- * | `ESCAPE`     | `\`                   | Escape character         |
- * | `WHITESPACE` | ` `, `\t`, `\n`, `\r` | Whitespace               |
+ * | Token type    | Delimiter             | Description                    |
+ * | ------------- | --------------------- | ------------------------------ |
+ * | `LBRACE`      | `{`                   | Start of an object             |
+ * | `RBRACE`      | `}`                   | End of an object               |
+ * | `LBRACKET`    | `[`                   | Start of an array              |
+ * | `RBRACKET`    | `]`                   | End of an array                |
+ * | `COLON`       | `:`                   | Key-value separator            |
+ * | `COMMA`       | `,`                   | Member/element separator       |
+ * | `STRING`      | `"`                   | Start/end of a string          |
+ * | `DIGIT`       | `-`, `1`, `2`, etc.   | Integer or float               |
+ * | `TRUE`        | `t`                   | True literal                   |
+ * | `FALSE`       | `f`                   | False literal                  |
+ * | `NULL`        | `n`                   | Null literal                   |
+ * | `ESCAPE`      | `\`                   | Escape character               |
+ * | `EXPONENTIAL` | `e`, `E`              | Exponential notation character |
+ * | `WHITESPACE`  | ` `, `\t`, `\n`, `\r` | Whitespace                     |
  *
  * @enum {symbol}
  */
@@ -38,11 +39,13 @@ export const JSONTokenType = {
   Colon: Symbol(":"),
   Comma: Symbol(","),
   String: Symbol('"'),
-  Number: Symbol("-0123456789"),
+  Digit: Symbol("0123456789"),
+  Minus: Symbol("-"),
   True: Symbol("t"),
   False: Symbol("f"),
   Null: Symbol("n"),
   Escape: Symbol("\\"),
+  Exponential: Symbol("eE"),
   Whitespace: Symbol(" \t\n\r"),
 } as const;
 export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
@@ -263,7 +266,8 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
 
   private static readonly bufferSymbols = new Set<JSONTokenType | undefined>([
     JSONTokenType.Escape,
-    JSONTokenType.Number,
+    JSONTokenType.Digit,
+    JSONTokenType.Minus,
     JSONTokenType.True,
     JSONTokenType.False,
     JSONTokenType.Null,

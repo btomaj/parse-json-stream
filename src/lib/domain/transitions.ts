@@ -141,7 +141,14 @@ const objectTransitions: Array<JSONTransition> = [
   // Open object value: number
   new JSONTransition(
     JSONValue.None, // We're waiting for a value, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
+    JSONValue.Object, // inside an object,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Object, JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.None, // We're waiting for a value, and
+    JSONTokenType.Minus, // we find a minus sign
     JSONValue.Object, // inside an object,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Object, JSONValue.Number], // we step inside the number
@@ -363,7 +370,14 @@ const arrayTransitions: Array<JSONTransition> = [
   // Open array element: number
   new JSONTransition(
     JSONValue.None, // We're waiting for a value, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
+    JSONValue.Array, // inside an array
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Array, JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.None, // We're waiting for a value, and
+    JSONTokenType.Minus, // we find a minus sign
     JSONValue.Array, // inside an array
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Array, JSONValue.Number], // we step inside the number
@@ -529,10 +543,33 @@ const numberTransitions: Array<JSONTransition> = [
   // Open number
   new JSONTransition(
     JSONValue.None, // We're waiting for a value, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
     JSONValue.None, // without context,
     JSONValue.Number, // so the next value is a number, and
-    [JSONValue.None, JSONValue.Number], // step inside the number
+    [JSONValue.None, JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.None, // We're waiting for a value, and
+    JSONTokenType.Minus, // we find a minus sign
+    JSONValue.None, // without context,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.None, JSONValue.Number], // we step inside the number
+  ),
+  // Open number escape
+  new JSONTransition(
+    JSONValue.Number, // Value is a number, and
+    JSONTokenType.Exponential, // we find an exponential character
+    JSONValue.Number, // inside a number,
+    JSONValue.Number, // so the value is still the number, and
+    [JSONValue.Number], // we stay inside the number
+  ),
+  // Close number (minus sign)
+  new JSONTransition(
+    JSONValue.Number, // Value is a number, and
+    JSONTokenType.Minus, // we find a minus sign
+    JSONValue.Number, // after a number,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Number], // we step inside the number
   ),
   // Close number (whitespace)
   new JSONTransition(
@@ -636,7 +673,14 @@ const trueTransitions: Array<JSONTransition> = [
   // Close true (number start)
   new JSONTransition(
     JSONValue.True, // Value is true literal, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
+    JSONValue.True, // after the true literal,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.True, // Value is true literal, and
+    JSONTokenType.Minus, // we find a minus sign
     JSONValue.True, // after the true literal,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Number], // we step inside the number
@@ -711,7 +755,14 @@ const falseTransitions: Array<JSONTransition> = [
   // Close false (number start)
   new JSONTransition(
     JSONValue.False, // Value is false literal, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
+    JSONValue.False, // after the false literal,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.False, // Value is false literal, and
+    JSONTokenType.Minus, // we find a minus sign
     JSONValue.False, // after the false literal,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Number], // we step inside the number
@@ -786,7 +837,14 @@ const nullTransitions: Array<JSONTransition> = [
   // Close null (number start)
   new JSONTransition(
     JSONValue.Null, // Value is null literal, and
-    JSONTokenType.Number, // we find a number
+    JSONTokenType.Digit, // we find a digit
+    JSONValue.Null, // after the null literal,
+    JSONValue.Number, // so the next value is a number, and
+    [JSONValue.Number], // we step inside the number
+  ),
+  new JSONTransition(
+    JSONValue.Null, // Value is null literal, and
+    JSONTokenType.Minus, // we find a minus sign
     JSONValue.Null, // after the null literal,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Number], // we step inside the number

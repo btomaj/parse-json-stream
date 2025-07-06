@@ -340,7 +340,7 @@ describe("JSONParser", () => {
     });
     lexer.setReturnToken({
       type: JSONValue.Number,
-      symbol: JSONTokenType.Number,
+      symbol: JSONTokenType.Digit,
       lexeme: "1",
     });
     lexer.setReturnToken({
@@ -350,7 +350,7 @@ describe("JSONParser", () => {
     });
     lexer.setReturnToken({
       type: JSONValue.Number,
-      symbol: JSONTokenType.Number,
+      symbol: JSONTokenType.Digit,
       lexeme: "1",
     });
     lexer.setReturnToken({
