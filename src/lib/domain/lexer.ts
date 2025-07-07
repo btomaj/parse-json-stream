@@ -21,10 +21,10 @@ export enum JSONValue {
  * | `COLON`       | `:`                   | Key-value separator            |
  * | `COMMA`       | `,`                   | Member/element separator       |
  * | `STRING`      | `"`                   | Start/end of a string          |
- * | `DIGIT`       | `-`, `1`, `2`, etc.   | Integer or float               |
- * | `TRUE`        | `t`                   | True literal                   |
- * | `FALSE`       | `f`                   | False literal                  |
- * | `NULL`        | `n`                   | Null literal                   |
+ * | `NUMBER`      | `-`, `1`, `2`, etc.   | Start of an integer or float   |
+ * | `TRUE`        | `t`                   | Start of a true literal        |
+ * | `FALSE`       | `f`                   | Start of a false literal       |
+ * | `NULL`        | `n`                   | Start of a null literal        |
  * | `ESCAPE`      | `\`                   | Escape character               |
  * | `EXPONENTIAL` | `e`, `E`              | Exponential notation character |
  * | `WHITESPACE`  | ` `, `\t`, `\n`, `\r` | Whitespace                     |
@@ -39,8 +39,7 @@ export const JSONTokenType = {
   Colon: Symbol(":"),
   Comma: Symbol(","),
   String: Symbol('"'),
-  Digit: Symbol("0123456789"),
-  Minus: Symbol("-"),
+  Number: Symbol("-0123456789"),
   True: Symbol("t"),
   False: Symbol("f"),
   Null: Symbol("n"),
@@ -115,10 +114,6 @@ export abstract class FSM<
   }
 }
 
-/**
- * TODO
- * - [ ] Determine what should be async
- */
 export abstract class Lexer<
   State extends Record<string, string | number | symbol>,
   Input extends Record<string, string | symbol>,
@@ -201,6 +196,11 @@ export abstract class Lexer<
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
+        if (!transition.inputSymbol) {
+          throw new Error(
+            `inputSymbol cannot be falsy for transition: ${transition}`,
+          );
+        }
         symbolBitmask[unicode] |= stateBitFlags[transition.currentState];
         this.unicodeCharacterMap[unicode] = transition.inputSymbol;
       }
@@ -209,10 +209,17 @@ export abstract class Lexer<
     return symbolBitmask;
   }
 
-  private findFirstSymbolForState(
+  /**
+   * Finds the first symbol with a transition for the current state.
+   * @param chunk The chunk to search.
+   * @param startIndex The starting index for the search.
+   * @returns A tuple containing the index of the first symbol and the symbol itself.
+   */
+  protected findFirstTransitionSymbol(
     chunk: string,
+    startIndex = 0,
   ): [number, Input[keyof Input] | null] {
-    for (let i = 0; i < chunk.length; i++) {
+    for (let i = startIndex; i < chunk.length; i++) {
       const code = chunk.charCodeAt(i);
       if (
         // bitwise AND
@@ -224,93 +231,68 @@ export abstract class Lexer<
     return [-1, null];
   }
 
-  protected *yieldToken(chunk: string): Generator<LexerToken<State, Input>> {
-    while (chunk.length > 0) {
-      const [index, symbol] = this.findFirstSymbolForState(chunk);
-      // if there is no lexeme in the chunk, emit the chunk
-      if (index < 0) {
-        yield { type: this.state, lexeme: chunk };
-        return;
-      }
-      // else there is a lexeme in the chunk
-      invariant(
-        symbol,
-        "findFirstTokenType found token, but type property of token is null",
-      );
-      // if the lexeme is not the first character in the chunk, emit everything up to (not including) the lexeme
-      if (index > 0) {
-        yield { type: this.state, lexeme: chunk.slice(0, index) };
-      }
-
-      this.transition(symbol);
-      yield { type: this.state, lexeme: chunk.slice(index, index + 1), symbol };
-
-      // if the lexeme is not the last character in the chunk, continue processing the rest of the chunk
-      chunk = chunk.slice(index + 1);
-    }
-  }
-
   /**
-   * Interprets a chunk, yields LexerTokens
+   * Interprets a chunk, and yields `LexerToken`s
    *
-   * Iterate over `this.yieldToken(chunk)` to extract tokens from a chunk.
+   * Use `findFirstTransitionSymbol` to find token boundary characters from the
+   * transitions, and tokenise the chunk into lexemes.
    * @param {string} chunk A chunk to interpret.
    */
   abstract tokenise(chunk: string): Generator<LexerToken<State, Input>>;
 }
 
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
-  private bufferedToken:
-    | LexerToken<typeof JSONValue, typeof JSONTokenType>
-    | undefined = undefined;
+  private static readonly primitiveSymbols = new Set<JSONTokenType | undefined>(
+    [
+      JSONTokenType.Number,
+      JSONTokenType.True,
+      JSONTokenType.False,
+      JSONTokenType.Null,
+    ],
+  );
 
-  private static readonly bufferSymbols = new Set<JSONTokenType | undefined>([
-    JSONTokenType.Escape,
-    JSONTokenType.Digit,
-    JSONTokenType.Minus,
-    JSONTokenType.True,
-    JSONTokenType.False,
-    JSONTokenType.Null,
-  ]);
-
-  public *tokenise(chunk: string) {
-    const tokens = this.yieldToken(chunk);
-    for (const token of tokens) {
-      if (JSONLexer.bufferSymbols.has(token.symbol)) {
-        if (!this.bufferedToken) {
-          // escape, first number, or first character of true, false, or null
-          this.bufferedToken = token;
-        } else {
-          // subsequent number, double escape, or new primitive
-          if (this.bufferedToken.symbol === token.symbol) {
-            this.bufferedToken.lexeme += token.lexeme;
-          } else {
-            yield this.bufferedToken;
-            this.bufferedToken = token;
-          }
-        }
-      } else if (this.bufferedToken) {
-        if (
-          !token.symbol ||
-          this.bufferedToken.symbol === JSONTokenType.Escape
-        ) {
-          this.bufferedToken.lexeme += token.lexeme;
-        }
-        yield this.bufferedToken;
-        this.bufferedToken = undefined;
-        if (
-          token.symbol &&
-          this.bufferedToken.symbol !== JSONTokenType.Escape
-        ) {
-          yield token;
-        }
-      } else {
-        yield token;
+  public *tokenise(
+    chunk: string,
+  ): Generator<LexerToken<typeof JSONValue, typeof JSONTokenType>> {
+    while (chunk.length > 0) {
+      const [index, symbol] = this.findFirstTransitionSymbol(chunk);
+      // if there is no symbol in the chunk, emit the chunk
+      if (index < 0) {
+        yield { type: this.state, lexeme: chunk };
+        return;
       }
-    }
+      // else there is a symbol in the chunk
+      invariant(symbol);
 
-    if (this.bufferedToken) {
-      yield this.bufferedToken;
+      if (
+        symbol === JSONTokenType.Escape || // Given JSONTransitions, JSONTokenType.Escape is only a symbol in JSONValue.String state
+        symbol === JSONTokenType.Exponential // Given JSONTransitions, JSONTokenType.Exponential is only a symbol in JSONValue.Number state
+      ) {
+        if (index + 1 === chunk.length) {
+          // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
+        } else {
+          index += 2; // continue the search for symbols after the escaped character
+          continue;
+        }
+      }
+
+      // if the symbol is not the first character in the chunk, emit everything up to (not including) the symbol
+      if (index > 0) {
+        yield { type: this.state, lexeme: chunk.slice(0, index) };
+      }
+
+      this.transition(symbol);
+      if (!JSONLexer.primitiveSymbols.has(symbol as JSONTokenType)) {
+        // XXX set state, and continue processing the chunk
+        yield {
+          type: this.state,
+          lexeme: chunk.slice(index, index + 1),
+          symbol,
+        };
+      }
+
+      // if the symbol is not the last character in the chunk, continue processing the rest of the chunk
+      chunk = chunk.slice(index + 1);
     }
   }
 }
