@@ -39,7 +39,8 @@ export const JSONTokenType = {
   Colon: Symbol(":"),
   Comma: Symbol(","),
   String: Symbol('"'),
-  Number: Symbol("-0123456789"),
+  Digit: Symbol("0123456789"),
+  Minus: Symbol("-"),
   True: Symbol("t"),
   False: Symbol("f"),
   Null: Symbol("n"),
@@ -242,23 +243,35 @@ export abstract class Lexer<
 }
 
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
-  private static readonly primitiveSymbols = new Set<JSONTokenType | undefined>(
-    [
-      JSONTokenType.Number,
-      JSONTokenType.True,
-      JSONTokenType.False,
-      JSONTokenType.Null,
-    ],
-  );
+  private static readonly symbolLexemes = new Set<JSONTokenType | undefined>([
+    JSONTokenType.LBrace,
+    JSONTokenType.RBrace,
+    JSONTokenType.LBracket,
+    JSONTokenType.RBracket,
+    JSONTokenType.Colon,
+    JSONTokenType.Comma,
+    JSONTokenType.String,
+  ]);
 
   public *tokenise(
     chunk: string,
   ): Generator<LexerToken<typeof JSONValue, typeof JSONTokenType>> {
-    while (chunk.length > 0) {
-      const [index, symbol] = this.findFirstTransitionSymbol(chunk);
-      // if there is no symbol in the chunk, emit the chunk
-      if (index < 0) {
-        yield { type: this.state, lexeme: chunk };
+    const chunkLength = chunk.length;
+    let startIndex = 0;
+    let symbolIndex = 0;
+    let symbol: JSONTokenType | null;
+    while (symbolIndex < chunkLength) {
+      [symbolIndex, symbol] = this.findFirstTransitionSymbol(
+        chunk,
+        symbolIndex,
+      );
+      // if there is no symbol remaining, emit the remainder
+      // XXX what if the symbol is the last character? Does this yield something?
+      if (symbolIndex < 0) {
+        yield {
+          type: this.state,
+          lexeme: chunk.slice(startIndex, chunkLength),
+        };
         return;
       }
       // else there is a symbol in the chunk
@@ -268,31 +281,37 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
         symbol === JSONTokenType.Escape || // Given JSONTransitions, JSONTokenType.Escape is only a symbol in JSONValue.String state
         symbol === JSONTokenType.Exponential // Given JSONTransitions, JSONTokenType.Exponential is only a symbol in JSONValue.Number state
       ) {
-        if (index + 1 === chunk.length) {
+        /*
+        if (symbolIndex + 1 === chunkLength) {
           // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
         } else {
-          index += 2; // continue the search for symbols after the escaped character
-          continue;
-        }
+        */
+        symbolIndex += 2; // skip past the escaped character
+        continue;
       }
 
-      // if the symbol is not the first character in the chunk, emit everything up to (not including) the symbol
-      if (index > 0) {
-        yield { type: this.state, lexeme: chunk.slice(0, index) };
-      }
-
-      this.transition(symbol);
-      if (!JSONLexer.primitiveSymbols.has(symbol as JSONTokenType)) {
-        // XXX set state, and continue processing the chunk
+      // if the symbol is not the first character, emit everything up to (not including) the symbol
+      if (symbolIndex > startIndex) {
         yield {
           type: this.state,
-          lexeme: chunk.slice(index, index + 1),
-          symbol,
+          lexeme: chunk.slice(startIndex, symbolIndex),
         };
       }
 
+      this.transition(symbol);
+      if (JSONLexer.symbolLexemes.has(symbol)) {
+        yield {
+          type: this.state,
+          lexeme: chunk.slice(symbolIndex, symbolIndex + 1),
+          symbol,
+        };
+        startIndex = symbolIndex + 1;
+      } else {
+        startIndex = symbolIndex;
+      }
+      symbolIndex += 1;
+
       // if the symbol is not the last character in the chunk, continue processing the rest of the chunk
-      chunk = chunk.slice(index + 1);
     }
   }
 }
