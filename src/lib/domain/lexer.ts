@@ -31,7 +31,7 @@ export enum JSONValue {
  *
  * @enum {symbol}
  */
-export const JSONTokenType = {
+export const JSONSymbol = {
   LBrace: Symbol("{"),
   RBrace: Symbol("}"),
   LBracket: Symbol("["),
@@ -39,19 +39,19 @@ export const JSONTokenType = {
   Colon: Symbol(":"),
   Comma: Symbol(","),
   String: Symbol('"'),
-  Digit: Symbol("0123456789"),
-  Minus: Symbol("-"),
+  Number: Symbol("-0123456789"),
   True: Symbol("t"),
   False: Symbol("f"),
   Null: Symbol("n"),
   Escape: Symbol("\\"),
-  Exponential: Symbol("eE"),
   Whitespace: Symbol(" \t\n\r"),
 } as const;
-export type JSONTokenType = (typeof JSONTokenType)[keyof typeof JSONTokenType];
+export type JSONSymbol = (typeof JSONSymbol)[keyof typeof JSONSymbol];
 
 export interface LexerToken<State, Input> {
   type: State[keyof State];
+  start: number;
+  end: number;
   lexeme: string;
   symbol?: Input[keyof Input];
 }
@@ -242,76 +242,109 @@ export abstract class Lexer<
   abstract tokenise(chunk: string): Generator<LexerToken<State, Input>>;
 }
 
-export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
-  private static readonly symbolLexemes = new Set<JSONTokenType | undefined>([
-    JSONTokenType.LBrace,
-    JSONTokenType.RBrace,
-    JSONTokenType.LBracket,
-    JSONTokenType.RBracket,
-    JSONTokenType.Colon,
-    JSONTokenType.Comma,
-    JSONTokenType.String,
+export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
+  private static readonly symbolLexemes = new Set<JSONSymbol | undefined>([
+    JSONSymbol.LBrace,
+    JSONSymbol.RBrace,
+    JSONSymbol.LBracket,
+    JSONSymbol.RBracket,
+    JSONSymbol.Colon,
+    JSONSymbol.Comma,
   ]);
 
   public *tokenise(
     chunk: string,
-  ): Generator<LexerToken<typeof JSONValue, typeof JSONTokenType>> {
+  ): Generator<LexerToken<typeof JSONValue, typeof JSONSymbol>> {
+    const spillBuffer: Array<string> = [];
     const chunkLength = chunk.length;
-    let startIndex = 0;
-    let symbolIndex = 0;
-    let symbol: JSONTokenType | null;
-    while (symbolIndex < chunkLength) {
-      [symbolIndex, symbol] = this.findFirstTransitionSymbol(
-        chunk,
-        symbolIndex,
-      );
-      // if there is no symbol remaining, emit the remainder
-      // XXX what if the symbol is the last character? Does this yield something?
-      if (symbolIndex < 0) {
+    /**
+     * 0-based offset for lexeme starting position
+     */
+    let mark = 0;
+    /**
+     * 0-based character index for current position
+     */
+    let position = 0;
+    let symbol: JSONSymbol | null;
+    while (position < chunkLength) {
+      [position, symbol] = this.findFirstTransitionSymbol(chunk, position);
+      // if there is no symbol remaining, emit the remaining non-whitespace content
+      if (position < 0) {
+        // don't yield whitespace
+        if (this.state === JSONValue.None) {
+          return;
+        }
+
         yield {
           type: this.state,
-          lexeme: chunk.slice(startIndex, chunkLength),
+          start: mark,
+          end: chunkLength,
+          lexeme: chunk.slice(mark, chunkLength),
         };
         return;
       }
       // else there is a symbol in the chunk
       invariant(symbol);
 
-      if (
-        symbol === JSONTokenType.Escape || // Given JSONTransitions, JSONTokenType.Escape is only a symbol in JSONValue.String state
-        symbol === JSONTokenType.Exponential // Given JSONTransitions, JSONTokenType.Exponential is only a symbol in JSONValue.Number state
-      ) {
-        /*
-        if (symbolIndex + 1 === chunkLength) {
+      if (this.state === JSONValue.String) {
+        // skip past the escaped character
+        if (symbol === JSONSymbol.Escape) {
           // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
-        } else {
-        */
-        symbolIndex += 2; // skip past the escaped character
-        continue;
+          /* if (symbolIndex + 1 === chunkLength) {
+          } else { */
+          position += 2;
+          continue;
+        }
+
+        // include closing quotation mark in lexeme
+        if (symbol === JSONSymbol.String) {
+          position += 1;
+        }
       }
 
       // if the symbol is not the first character, emit everything up to (not including) the symbol
-      if (symbolIndex > startIndex) {
+      // biome-ignore lint/suspicious/noConfusingLabels: early return
+      yieldLexeme: if (position > mark) {
+        // don't yield whitespace
+        if (this.state === JSONValue.None) {
+          mark = position;
+          break yieldLexeme;
+        }
+
         yield {
           type: this.state,
-          lexeme: chunk.slice(startIndex, symbolIndex),
+          start: mark,
+          end: position,
+          lexeme: chunk.slice(mark, position),
         };
+
+        mark = position; // start past lexeme
       }
 
       this.transition(symbol);
+
       if (JSONLexer.symbolLexemes.has(symbol)) {
+        // yield the symbol as the next token
+        position += 1; // advance position past symbol
         yield {
           type: this.state,
-          lexeme: chunk.slice(symbolIndex, symbolIndex + 1),
+          start: mark,
+          end: position,
+          lexeme: chunk.slice(mark, position),
           symbol,
         };
-        startIndex = symbolIndex + 1;
-      } else {
-        startIndex = symbolIndex;
+        mark = position; // continue after symbol
+      } else if (
+        // not closing quotation mark of a string
+        !(this.state !== JSONValue.String && symbol === JSONSymbol.String)
+      ) {
+        // include symbol in the next token
+        position += 1;
       }
-      symbolIndex += 1;
 
-      // if the symbol is not the last character in the chunk, continue processing the rest of the chunk
+      // if the symbol is not the last character in the chunk, loop, and continue processing the rest of the chunk
     }
+
+    // XXX return any remaining buffered value
   }
 }

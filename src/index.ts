@@ -1,4 +1,4 @@
-import { JSONLexer, JSONTokenType, JSONValue } from "~/lib/domain/lexer";
+import { JSONLexer, JSONSymbol, JSONValue } from "~/lib/domain/lexer";
 import { JSONParser } from "~/lib/domain/parser";
 import { StreamProcessorFactory } from "~/lib/infrastructure/stream-adapter";
 import { JSONTransitions } from "./lib/domain/transitions";
@@ -17,16 +17,13 @@ export function parseStream(
     | AsyncIterable<string | Uint8Array | ArrayBuffer>,
 ): void {
   const lexer = new JSONLexer(
-    JSONTokenType,
+    JSONSymbol,
     JSONTransitions,
-    JSONTokenType.Whitespace,
+    JSONSymbol.Whitespace,
   );
-  const parser = new JSONParser(
-    lexer,
-    JSONTransitions,
-    JSONTokenType.Whitespace,
-    [JSONValue.None],
-  );
+  const parser = new JSONParser(lexer, JSONTransitions, JSONSymbol.Whitespace, [
+    JSONValue.None,
+  ]);
 
   const processor = StreamProcessorFactory.create(stream);
   throw new Error("parseStream not yet implemented");

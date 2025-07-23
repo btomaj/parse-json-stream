@@ -196,21 +196,21 @@ describe("JSONLexer", () => {
   it.for([
     ["{}", ["{", "}"]],
     ["{:}", ["{", ":", "}"]],
-    ['{"key"}', ["{", '"', "key", '"', "}"]],
+    ['{"key"}', ["{", '"key"', "}"]],
     ["{,}", ["{", ",", "}"]],
-    ['{"key":{}}', ["{", '"', "key", '"', ":", "{", "}", "}"]],
-    ['{"key":[]}', ["{", '"', "key", '"', ":", "[", "]", "}"]],
-    ['{"key":"string"}', ["{", '"', "key", '"', ":", '"', "string", '"', "}"]],
-    ['{"key":3.2e1}', ["{", '"', "key", '"', ":", "3.2e1", "}"]],
-    ['{"key":-3.2e1}', ["{", '"', "key", '"', ":", "-3.2e1", "}"]],
-    ['{"key":3.2e1,}', ["{", '"', "key", '"', ":", "3.2e1", ",", "}"]],
-    ['{"key":-3.2e1,}', ["{", '"', "key", '"', ":", "-3.2e1", ",", "}"]],
-    ['{"key":true}', ["{", '"', "key", '"', ":", "true", "}"]],
-    ['{"key":true,}', ["{", '"', "key", '"', ":", "true", ",", "}"]],
-    ['{"key":false}', ["{", '"', "key", '"', ":", "false", "}"]],
-    ['{"key":false,}', ["{", '"', "key", '"', ":", "false", ",", "}"]],
-    ['{"key":null}', ["{", '"', "key", '"', ":", "null", "}"]],
-    ['{"key":null,}', ["{", '"', "key", '"', ":", "null", ",", "}"]],
+    ['{"key":{}}', ["{", '"key"', ":", "{", "}", "}"]],
+    ['{"key":[]}', ["{", '"key"', ":", "[", "]", "}"]],
+    ['{"key":"string"}', ["{", '"key"', ":", '"string"', "}"]],
+    ['{"key":3.2e1}', ["{", '"key"', ":", "3.2e1", "}"]],
+    ['{"key":-3.2e1}', ["{", '"key"', ":", "-3.2e1", "}"]],
+    ['{"key":3.2e1,}', ["{", '"key"', ":", "3.2e1", ",", "}"]],
+    ['{"key":-3.2e1,}', ["{", '"key"', ":", "-3.2e1", ",", "}"]],
+    ['{"key":true}', ["{", '"key"', ":", "true", "}"]],
+    ['{"key":true,}', ["{", '"key"', ":", "true", ",", "}"]],
+    ['{"key":false}', ["{", '"key"', ":", "false", "}"]],
+    ['{"key":false,}', ["{", '"key"', ":", "false", ",", "}"]],
+    ['{"key":null}', ["{", '"key"', ":", "null", "}"]],
+    ['{"key":null,}', ["{", '"key"', ":", "null", ",", "}"]],
   ])("should correctly tokenise object transition %O", ([chunk, expected]) => {
     // Arrange
     const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
@@ -229,7 +229,7 @@ describe("JSONLexer", () => {
     ["[,]", ["[", ",", "]"]],
     ["[[]]", ["[", "[", "]", "]"]],
     ["[{}]", ["[", "{", "}", "]"]],
-    ['["string"]', ["[", '"', "string", '"', "]"]],
+    ['["string"]', ["[", '"string"', "]"]],
     ["[3.2e1]", ["[", "3.2e1", "]"]],
     ["[-3.2e1]", ["[", "-3.2e1", "]"]],
     ["[true]", ["[", "true", "]"]],
@@ -249,10 +249,10 @@ describe("JSONLexer", () => {
   });
 
   it.for([
-    [" ", [" "]],
+    [" ", []],
     ["{}", ["{", "}"]],
     ["[]", ["[", "]"]],
-    ['""', ['"', '"']],
+    ['""', ['""']],
     ["1.2e-3", ["1.2e-3"]],
     ["-1.2E-3", ["-1.2E-3"]],
     ["true", ["true"]],
@@ -263,11 +263,11 @@ describe("JSONLexer", () => {
     ([addendum, expected]) => {
       // Arrange
       const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
-      const string = ['"', "string", '"'];
-      (expected as Array<string>).unshift(...string);
+      const string = '"string"';
+      (expected as Array<string>).unshift(string);
 
       // Act
-      const tokens = Array.from(lexer.tokenise(string.join("") + addendum)).map(
+      const tokens = Array.from(lexer.tokenise(string + addendum)).map(
         (token) => token.lexeme,
       );
 
@@ -291,7 +291,7 @@ describe("JSONLexer", () => {
   ])("should correctly tokenise string containing %O", ([addendum]) => {
     // Arrange
     const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
-    const expected = ['"', `str${addendum}ing`, '"'];
+    const expected = [`"str${addendum}ing"`];
 
     // Act
     const tokens = Array.from(lexer.tokenise(expected.join(""))).map(
@@ -331,8 +331,8 @@ describe("JSONLexer", () => {
       [" ", [number]],
       ["{}", [number, "{", "}"]],
       ["[]", [number, "[", "]"]],
-      ['""', [number, '"', '"']],
-      ["-3.2e-1", [number, "-3.2e-1"]],
+      ['""', [number, '""']],
+      ["-3.2e-1", [`${number}-3.2e-1`]],
       ["true", [number, "true"]],
       ["false", [number, "false"]],
       ["null", [number, "null"]],
@@ -356,7 +356,7 @@ describe("JSONLexer", () => {
         [" ", [primitive]],
         ["{}", [primitive, "{", "}"]],
         ["[]", [primitive, "[", "]"]],
-        ['""', [primitive, '"', '"']],
+        ['""', [primitive, '""']],
         ["1.2e-3", [primitive, "1.2e-3"]],
         ["-1.2E-3", [primitive, "-1.2E-3"]],
         ["true", [primitive, "true"]],
@@ -374,17 +374,45 @@ describe("JSONLexer", () => {
     },
   );
 
-  it("should not tokenise whitespace", async () => {
+  it("should ignore whitespace surrounding lexemes", () => {
     // Arrange
     const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
-    const expected = " \t\n\r";
 
     // Act
-    const tokens = Array.from(lexer.tokenise(expected)).map(
+    const tokens = Array.from(
+      lexer.tokenise(' "string" 1 \t\n\r true false null '),
+    ).map((token) => token.lexeme);
+
+    // Assert
+    expect(tokens).toEqual(['"string"', "1", "true", "false", "null"]);
+  });
+
+  it("should should buffer incomplete non-string primitives", () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+
+    // Act
+    lexer.tokenise("1");
+    const tokens = Array.from(lexer.tokenise("23")).map(
       (token) => token.lexeme,
     );
 
     // Assert
-    expect(tokens[0]).not.toEqual(expected);
+    expect(tokens).toEqual(["123"]);
+  });
+
+  it("should escape across chunks", () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+
+    // Act
+    lexer.tokenise('"\\');
+    lexer.tokenise('"');
+    const tokens = Array.from(lexer.tokenise('123"')).map(
+      (token) => token.lexeme,
+    );
+
+    // Assert
+    expect(tokens).toEqual(['"\\"123"']);
   });
 });
