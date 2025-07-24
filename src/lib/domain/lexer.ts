@@ -286,20 +286,13 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       // else there is a symbol in the chunk
       invariant(symbol);
 
-      if (this.state === JSONValue.String) {
-        // skip past the escaped character
-        if (symbol === JSONSymbol.Escape) {
-          // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
-          /* if (symbolIndex + 1 === chunkLength) {
+      // skip past the escaped character
+      if (symbol === JSONSymbol.Escape) {
+        // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
+        /* if (symbolIndex + 1 === chunkLength) {
           } else { */
-          position += 2;
-          continue;
-        }
-
-        // include closing quotation mark in lexeme
-        if (symbol === JSONSymbol.String) {
-          position += 1;
-        }
+        position += 2;
+        continue;
       }
 
       // if the symbol is not the first character, emit everything up to (not including) the symbol
@@ -323,9 +316,8 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
       this.transition(symbol);
 
+      position += 1; // advance position past symbol
       if (JSONLexer.symbolLexemes.has(symbol)) {
-        // yield the symbol as the next token
-        position += 1; // advance position past symbol
         yield {
           type: this.state,
           start: mark,
@@ -335,11 +327,11 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
         };
         mark = position; // continue after symbol
       } else if (
-        // not closing quotation mark of a string
-        !(this.state !== JSONValue.String && symbol === JSONSymbol.String)
+        // skip opening quotation mark of a string
+        this.state === JSONValue.String &&
+        symbol === JSONSymbol.String
       ) {
-        // include symbol in the next token
-        position += 1;
+        mark = position; // continue after symbol
       }
 
       // if the symbol is not the last character in the chunk, loop, and continue processing the rest of the chunk
