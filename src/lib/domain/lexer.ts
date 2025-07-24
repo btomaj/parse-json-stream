@@ -52,7 +52,7 @@ export interface LexerToken<State, Input> {
   type: State[keyof State];
   start: number;
   end: number;
-  lexeme: string;
+  buffer: string;
   symbol?: Input[keyof Input];
 }
 
@@ -279,7 +279,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
           type: this.state,
           start: mark,
           end: chunkLength,
-          lexeme: chunk.slice(mark, chunkLength),
+          buffer: chunk,
         };
         return;
       }
@@ -315,7 +315,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
           type: this.state,
           start: mark,
           end: position,
-          lexeme: chunk.slice(mark, position),
+          buffer: chunk,
         };
 
         mark = position; // start past lexeme
@@ -330,7 +330,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
           type: this.state,
           start: mark,
           end: position,
-          lexeme: chunk.slice(mark, position),
+          buffer: chunk,
           symbol,
         };
         mark = position; // continue after symbol

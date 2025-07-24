@@ -216,8 +216,8 @@ describe("JSONLexer", () => {
     const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
 
     // Act
-    const tokens = Array.from(lexer.tokenise(chunk as string)).map(
-      (token) => token.lexeme,
+    const tokens = Array.from(lexer.tokenise(chunk as string)).map((token) =>
+      token.buffer.slice(token.start, token.end),
     );
 
     // Assert
@@ -240,8 +240,8 @@ describe("JSONLexer", () => {
     const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
 
     // Act
-    const tokens = Array.from(lexer.tokenise(chunk as string)).map(
-      (token) => token.lexeme,
+    const tokens = Array.from(lexer.tokenise(chunk as string)).map((token) =>
+      token.buffer.slice(token.start, token.end),
     );
 
     // Assert
@@ -268,7 +268,7 @@ describe("JSONLexer", () => {
 
       // Act
       const tokens = Array.from(lexer.tokenise(string + addendum)).map(
-        (token) => token.lexeme,
+        (token) => token.buffer.slice(token.start, token.end),
       );
 
       // Assert
@@ -294,8 +294,8 @@ describe("JSONLexer", () => {
     const expected = [`"str${addendum}ing"`];
 
     // Act
-    const tokens = Array.from(lexer.tokenise(expected.join(""))).map(
-      (token) => token.lexeme,
+    const tokens = Array.from(lexer.tokenise(expected.join(""))).map((token) =>
+      token.buffer.slice(token.start, token.end),
     );
 
     // Assert
@@ -339,7 +339,7 @@ describe("JSONLexer", () => {
     ])("immediately followed by %O", ([addendum, expected]) => {
       // Act
       const tokens = Array.from(lexer.tokenise(number + addendum)).map(
-        (token) => token.lexeme,
+        (token) => token.buffer.slice(token.start, token.end),
       );
 
       // Assert
@@ -365,7 +365,7 @@ describe("JSONLexer", () => {
       ])("immediately followed by %O", ([addendum, expected]) => {
         // Act
         const tokens = Array.from(lexer.tokenise(primitive + addendum)).map(
-          (token) => token.lexeme,
+          (token) => token.buffer.slice(token.start, token.end),
         );
 
         // Assert
@@ -381,7 +381,7 @@ describe("JSONLexer", () => {
     // Act
     const tokens = Array.from(
       lexer.tokenise(' "string" 1 \t\n\r true false null '),
-    ).map((token) => token.lexeme);
+    ).map((token) => token.buffer.slice(token.start, token.end));
 
     // Assert
     expect(tokens).toEqual(['"string"', "1", "true", "false", "null"]);
@@ -393,8 +393,8 @@ describe("JSONLexer", () => {
 
     // Act
     lexer.tokenise("1");
-    const tokens = Array.from(lexer.tokenise("23")).map(
-      (token) => token.lexeme,
+    const tokens = Array.from(lexer.tokenise("23")).map((token) =>
+      token.buffer.slice(token.start, token.end),
     );
 
     // Assert
@@ -408,8 +408,8 @@ describe("JSONLexer", () => {
     // Act
     lexer.tokenise('"\\');
     lexer.tokenise('"');
-    const tokens = Array.from(lexer.tokenise('123"')).map(
-      (token) => token.lexeme,
+    const tokens = Array.from(lexer.tokenise('123"')).map((token) =>
+      token.buffer.slice(token.start, token.end),
     );
 
     // Assert
