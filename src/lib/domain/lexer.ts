@@ -243,6 +243,8 @@ export abstract class Lexer<
 }
 
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
+  private isEscaped = false;
+
   private static readonly symbolLexemes = new Set<JSONSymbol | undefined>([
     JSONSymbol.LBrace,
     JSONSymbol.RBrace,
@@ -267,6 +269,12 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
     let position = 0;
     let symbol: JSONSymbol | null;
     while (position < chunkLength) {
+      // if the last character in the previous chunk was an escape character, escape the first character
+      if (this.isEscaped) {
+        this.isEscaped = false;
+        position += 1;
+      }
+
       [position, symbol] = this.findFirstTransitionSymbol(chunk, position);
       // if there is no symbol remaining, emit the remaining non-whitespace content
       if (position < 0) {
@@ -288,9 +296,11 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
       // skip past the escaped character
       if (symbol === JSONSymbol.Escape) {
-        // XXX if the character is last in the chunk, escape the first character in the next chunk, and emit everything
-        /* if (symbolIndex + 1 === chunkLength) {
-          } else { */
+        // if the character is last in the chunk, escape the first character in the next chunk
+        if (position + 1 === chunkLength) {
+          this.isEscaped = true;
+          break;
+        }
         position += 2;
         continue;
       }
