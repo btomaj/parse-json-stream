@@ -409,11 +409,11 @@ describe("JSONLexer", () => {
     const tokens = [];
     tokens.push(...lexer.tokenise('"\\'));
     tokens.push(...lexer.tokenise('"123"'));
-    const buffer = tokens
+    const lexeme = tokens
       .map((token) => token.buffer.slice(token.start, token.end))
       .join("");
 
     // Assert
-    expect(buffer).toEqual('"123');
+    expect(lexeme).toEqual('"123');
   });
 });

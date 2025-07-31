@@ -257,7 +257,6 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
   public *tokenise(
     chunk: string,
   ): Generator<LexerToken<typeof JSONValue, typeof JSONSymbol>> {
-    const spillBuffer: Array<string> = [];
     const chunkLength = chunk.length;
     /**
      * 0-based offset for lexeme starting position
@@ -268,13 +267,14 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
      */
     let position = 0;
     let symbol: JSONSymbol | null;
-    while (position < chunkLength) {
-      // if the last character in the previous chunk was an escape character, escape the first character
-      if (this.isEscaped) {
-        this.isEscaped = false;
-        position += 1;
-      }
 
+    // if the last character in the previous chunk was an escape character, escape the first character
+    if (this.isEscaped) {
+      this.isEscaped = false;
+      position += 1;
+    }
+
+    while (position < chunkLength) {
       [position, symbol] = this.findFirstTransitionSymbol(chunk, position);
       // if there is no symbol remaining, emit the remaining non-whitespace content
       if (position < 0) {

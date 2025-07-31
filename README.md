@@ -1,5 +1,7 @@
 # parse-json-stream
 
+## Roadmap
+- [ ] Buffer incomplete non-string primitives between chunks
 
 ## McKeeman Form diagram
 Source: https://www.json.org/json-en.html
