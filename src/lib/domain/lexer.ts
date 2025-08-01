@@ -212,6 +212,26 @@ export abstract class Lexer<
     return bitmaskArray;
   }
 
+  protected processLexicalRuleCharacters(
+    lexicalRule: Input[keyof Input],
+    processor: (character: string) => void,
+  ) {
+    let characters: string;
+    if (typeof lexicalRule === "symbol") {
+      if (typeof lexicalRule.description === "undefined") {
+        throw new Error(
+          "Symbol.description cannot be undefined when Symbol is used for StateTokenType.inputSymbol",
+        );
+      }
+      characters = lexicalRule.description;
+    } else {
+      characters = lexicalRule.toString();
+    }
+    for (const character of characters) {
+      processor(character);
+    }
+  }
+
   /**
    * Finds the first symbol with a transition for the current state.
    * @param chunk The chunk to search.
@@ -247,14 +267,35 @@ export abstract class Lexer<
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
   private isEscaped = false;
 
-  private static readonly symbolLexemes = new Set<JSONSymbol | undefined>([
-    JSONSymbol.LBrace,
-    JSONSymbol.RBrace,
-    JSONSymbol.LBracket,
-    JSONSymbol.RBracket,
-    JSONSymbol.Colon,
-    JSONSymbol.Comma,
-  ]);
+  private static readonly symbolLexemes = new Uint8Array(128);
+
+  constructor(
+    transitions: Array<
+      FSMTransition<
+        (typeof JSONValue)[keyof typeof JSONValue],
+        (typeof JSONSymbol)[keyof typeof JSONSymbol]
+      >
+    >,
+    initialState: (typeof JSONValue)[keyof typeof JSONValue],
+  ) {
+    super(transitions, initialState);
+    for (const lexicalRule of [
+      JSONSymbol.LBrace,
+      JSONSymbol.RBrace,
+      JSONSymbol.LBracket,
+      JSONSymbol.RBracket,
+      JSONSymbol.Colon,
+      JSONSymbol.Comma,
+    ]) {
+      this.processLexicalRuleCharacters(lexicalRule, (character) => {
+        const unicode = character.charCodeAt(0);
+        if (unicode > 127) {
+          throw new Error("Non-ASCII character");
+        }
+        JSONLexer.symbolLexemes[unicode] = 1;
+      });
+    }
+  }
 
   public *tokenise(
     chunk: string,
@@ -329,7 +370,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       this.transition(symbol);
 
       position += 1; // advance position past symbol
-      if (JSONLexer.symbolLexemes.has(symbol)) {
+      if (JSONLexer.symbolLexemes[chunk.charCodeAt(position - 1)]) {
         yield {
           type: this.state,
           start: mark,
