@@ -137,8 +137,8 @@ export abstract class Lexer<
 
     this.stateBitFlags = this.createStateBitFlags(states);
     this.unicodeCharacterBitMask = this.createStateSymbolBitMask(
-      this.stateBitFlags,
       transitions,
+      this.stateBitFlags,
     );
   }
 
@@ -162,17 +162,18 @@ export abstract class Lexer<
   }
 
   private createStateSymbolBitMask(
-    stateBitFlags: Record<State[keyof State], number>,
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
+    bitmasks: Record<State[keyof State], number> | undefined,
   ): Uint8Array | Uint16Array | Uint32Array {
-    let symbolBitmask: Uint8Array | Uint16Array | Uint32Array;
-    const numberOfStates = Object.keys(stateBitFlags).length;
-    if (numberOfStates <= 8) {
-      symbolBitmask = new Uint8Array(128);
-    } else if (numberOfStates <= 16) {
-      symbolBitmask = new Uint16Array(128);
-    } else if (numberOfStates <= 32) {
-      symbolBitmask = new Uint32Array(128);
+    let symbolBitmaskArray: Uint8Array | Uint16Array | Uint32Array;
+    const numberOfBitmasks =
+      typeof bitmasks === "object" ? Object.keys(bitmasks).length : 0;
+    if (numberOfBitmasks <= 8) {
+      symbolBitmaskArray = new Uint8Array(128);
+    } else if (numberOfBitmasks <= 16) {
+      symbolBitmaskArray = new Uint16Array(128);
+    } else if (numberOfBitmasks <= 32) {
+      symbolBitmaskArray = new Uint32Array(128);
     } else {
       throw new Error(
         "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
@@ -202,12 +203,13 @@ export abstract class Lexer<
             `inputSymbol cannot be falsy for transition: ${transition}`,
           );
         }
-        symbolBitmask[unicode] |= stateBitFlags[transition.currentState];
+        symbolBitmaskArray[unicode] |=
+          bitmasks?.[transition.currentState] ?? 0xffffffff;
         this.unicodeCharacterMap[unicode] = transition.inputSymbol;
       }
     }
 
-    return symbolBitmask;
+    return symbolBitmaskArray;
   }
 
   /**
