@@ -118,11 +118,10 @@ describe("Abstract Lexer", () => {
 
   class TestLexer extends Lexer<typeof TestState, typeof TestTokenType> {
     constructor(
-      states = TestState,
       transitions = testTransitions,
       initialState = TestState.Initial,
     ) {
-      super(states, transitions, initialState);
+      super(transitions, initialState);
     }
 
     public *tokenise(): Generator<
@@ -132,16 +131,20 @@ describe("Abstract Lexer", () => {
 
   it("should throw error when more than 32 states are provided", () => {
     // Arrange
-    const tooManyStates: Record<string, string | number> & typeof TestState = {
-      ...TestState,
-    };
+    const tooManyTransitions = [...testTransitions];
     for (let i = 0; i < 33; i++) {
-      tooManyStates[`state${i}`] = `STATE_${i}`;
+      tooManyTransitions.push(
+        new FSMTransition(
+          `STATE_${i}` as unknown as TestState,
+          TestTokenType.Numbers,
+          `STATE_${i + 1}` as unknown as TestState,
+        ),
+      );
     }
 
     // Act & Assert
     expect(() => {
-      new TestLexer(tooManyStates);
+      new TestLexer(tooManyTransitions);
     }).toThrow(
       "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
     );
@@ -155,7 +158,7 @@ describe("Abstract Lexer", () => {
     ];
 
     // Act & Assert
-    expect(() => new TestLexer(TestState, nonAsciiTransitions)).toThrow(
+    expect(() => new TestLexer(nonAsciiTransitions)).toThrow(
       "Non-ASCII character",
     );
   });
@@ -168,16 +171,14 @@ describe("Abstract Lexer", () => {
     ];
 
     // Act & Assert
-    expect(
-      () => new TestLexer(TestState, undefinedSymbolStateTokenTypes),
-    ).toThrow(
+    expect(() => new TestLexer(undefinedSymbolStateTokenTypes)).toThrow(
       "Symbol.description cannot be undefined when Symbol is used for StateTokenType.inputSymbol",
     );
   });
 
   it("should initialise to initial state", () => {
     // Arrange & Act
-    const lexer = new TestLexer(TestState, testTransitions, TestState.Initial);
+    const lexer = new TestLexer(testTransitions, TestState.Initial);
 
     // Assert
     expect(lexer.state).toBe(TestState.Initial);
@@ -187,7 +188,7 @@ describe("Abstract Lexer", () => {
 describe("JSONLexer", () => {
   it("should initialize with correct state", () => {
     // Arrange & Act
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Assert
     expect(lexer.state).toBe(JSONValue.None);
@@ -213,7 +214,7 @@ describe("JSONLexer", () => {
     ['{"key":null,}', ["{", "key", ":", "null", ",", "}"]],
   ])("should correctly tokenise object transition %O", ([chunk, expected]) => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Act
     const tokens = Array.from(lexer.tokenise(chunk as string)).map((token) =>
@@ -237,7 +238,7 @@ describe("JSONLexer", () => {
     ["[null]", ["[", "null", "]"]],
   ])("should correctly tokenise array transition %O", ([chunk, expected]) => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Act
     const tokens = Array.from(lexer.tokenise(chunk as string)).map((token) =>
@@ -262,7 +263,7 @@ describe("JSONLexer", () => {
     "should correctly tokenise string followed by %O",
     ([addendum, expected]) => {
       // Arrange
-      const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+      const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
       const string = "string";
       (expected as Array<string>).unshift(string);
 
@@ -290,7 +291,7 @@ describe("JSONLexer", () => {
     ["null"],
   ])("should correctly tokenise string containing %O", ([addendum]) => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
     const expected = `str${addendum}ing`;
 
     // Act
@@ -326,7 +327,7 @@ describe("JSONLexer", () => {
     ["-3.2e-1"],
   ])("should correctly tokenise number %s", ([number]) => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
     it.for([
       [" ", [number]],
       ["{}", [number, "{", "}"]],
@@ -351,7 +352,7 @@ describe("JSONLexer", () => {
     "should correctly tokenise %s",
     ([primitive]) => {
       // Arrange
-      const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+      const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
       it.for([
         [" ", [primitive]],
         ["{}", [primitive, "{", "}"]],
@@ -376,7 +377,7 @@ describe("JSONLexer", () => {
 
   it("should ignore whitespace surrounding lexemes", () => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Act
     const tokens = Array.from(
@@ -389,7 +390,7 @@ describe("JSONLexer", () => {
 
   it.skip("should should buffer incomplete non-string primitives", () => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Act
     lexer.tokenise("1");
@@ -403,7 +404,7 @@ describe("JSONLexer", () => {
 
   it("should escape across chunks", () => {
     // Arrange
-    const lexer = new JSONLexer(JSONValue, JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
     // Act
     const tokens = [];

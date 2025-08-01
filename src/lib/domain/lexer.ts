@@ -119,9 +119,9 @@ export abstract class Lexer<
   State extends Record<string, string | number | symbol>,
   Input extends Record<string, string | symbol>,
 > extends FSM<State, Input> {
-  private readonly stateBitFlags: Record<State[keyof State], number>;
+  private readonly stateBitmasks: Record<State[keyof State], number>;
   // bit mask for ASCII lexical rules
-  private readonly unicodeCharacterBitMask:
+  private readonly unicodeCharacterFlags:
     | Uint8Array
     | Uint16Array
     | Uint32Array;
@@ -129,41 +129,48 @@ export abstract class Lexer<
   private readonly unicodeCharacterMap: Array<Input[keyof Input]> = [];
 
   constructor(
-    states: State,
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     initialState: State[keyof State],
   ) {
     super(transitions, initialState);
 
-    this.stateBitFlags = this.createStateBitFlags(states);
-    this.unicodeCharacterBitMask = this.createSymbolBitmask(
+    this.stateBitmasks = this.createStateBitmasks(transitions);
+    this.unicodeCharacterFlags = this.createSymbolFlags(
       transitions,
-      this.stateBitFlags,
+      this.stateBitmasks,
     );
   }
 
-  private createStateBitFlags(
-    states: State,
+  private createStateBitmasks(
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
   ): Record<State[keyof State], number> {
-    const stateLabels = Object.values(states) as Array<State[keyof State]>;
-    const stateBitFlags = {} as Record<State[keyof State], number>;
+    const stateLabels = new Set<State[keyof State]>();
 
-    if (stateLabels.length > 32) {
+    // Extract all unique states from transitions
+    for (const transition of transitions) {
+      stateLabels.add(transition.currentState);
+      stateLabels.add(transition.nextState);
+    }
+
+    const stateLabelsArray = Array.from(stateLabels);
+    const stateBitmasks = {} as Record<State[keyof State], number>;
+
+    if (stateLabelsArray.length > 32) {
       throw new Error(
         "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
       );
     }
 
-    stateLabels.forEach((state, index) => {
-      stateBitFlags[state] = 1 << index;
+    stateLabelsArray.forEach((state, index) => {
+      stateBitmasks[state] = 1 << index;
     });
 
-    return stateBitFlags;
+    return stateBitmasks;
   }
 
-  private createSymbolBitmask(
+  private createSymbolFlags(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
-    bitmasks: Record<State[keyof State], number> | undefined,
+    bitmasks: Record<State[keyof State], number>,
   ): Uint8Array | Uint16Array | Uint32Array {
     let bitmaskArray: Uint8Array | Uint16Array | Uint32Array;
     const numberOfBitmasks =
@@ -187,26 +194,15 @@ export abstract class Lexer<
         );
       }
       const lexicalRule = transition.inputSymbol;
-      let characters: string;
-      if (typeof lexicalRule === "symbol") {
-        if (typeof lexicalRule.description === "undefined") {
-          throw new Error(
-            "Symbol.description cannot be undefined when Symbol is used for StateTokenType.inputSymbol",
-          );
-        }
-        characters = lexicalRule.description;
-      } else {
-        characters = lexicalRule.toString();
-      }
-      for (const character of characters) {
+      this.processLexicalRuleCharacters(lexicalRule, (character) => {
         const unicode = character.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
         bitmaskArray[unicode] |=
-          bitmasks?.[transition.currentState] ?? 0xffffffff;
+          bitmasks[transition.currentState] ?? 0xffffffff;
         this.unicodeCharacterMap[unicode] = transition.inputSymbol;
-      }
+      });
     }
 
     return bitmaskArray;
@@ -246,7 +242,7 @@ export abstract class Lexer<
       const code = chunk.charCodeAt(i);
       if (
         // bitwise AND
-        this.unicodeCharacterBitMask[code] & this.stateBitFlags[this.state]
+        this.unicodeCharacterFlags[code] & this.stateBitmasks[this.state]
       ) {
         return [i, this.unicodeCharacterMap[code]];
       }
