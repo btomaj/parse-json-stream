@@ -136,7 +136,7 @@ export abstract class Lexer<
     super(transitions, initialState);
 
     this.stateBitFlags = this.createStateBitFlags(states);
-    this.unicodeCharacterBitMask = this.createStateSymbolBitMask(
+    this.unicodeCharacterBitMask = this.createSymbolBitmask(
       transitions,
       this.stateBitFlags,
     );
@@ -161,19 +161,19 @@ export abstract class Lexer<
     return stateBitFlags;
   }
 
-  private createStateSymbolBitMask(
+  private createSymbolBitmask(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     bitmasks: Record<State[keyof State], number> | undefined,
   ): Uint8Array | Uint16Array | Uint32Array {
-    let symbolBitmaskArray: Uint8Array | Uint16Array | Uint32Array;
+    let bitmaskArray: Uint8Array | Uint16Array | Uint32Array;
     const numberOfBitmasks =
       typeof bitmasks === "object" ? Object.keys(bitmasks).length : 0;
     if (numberOfBitmasks <= 8) {
-      symbolBitmaskArray = new Uint8Array(128);
+      bitmaskArray = new Uint8Array(128);
     } else if (numberOfBitmasks <= 16) {
-      symbolBitmaskArray = new Uint16Array(128);
+      bitmaskArray = new Uint16Array(128);
     } else if (numberOfBitmasks <= 32) {
-      symbolBitmaskArray = new Uint32Array(128);
+      bitmaskArray = new Uint32Array(128);
     } else {
       throw new Error(
         "More than 32 states, but JavaScript only supports bitwise operations up to 32 bits",
@@ -181,6 +181,11 @@ export abstract class Lexer<
     }
 
     for (const transition of transitions) {
+      if (!transition.inputSymbol) {
+        throw new Error(
+          `inputSymbol cannot be falsy for transition: ${transition}`,
+        );
+      }
       const lexicalRule = transition.inputSymbol;
       let characters: string;
       if (typeof lexicalRule === "symbol") {
@@ -198,18 +203,13 @@ export abstract class Lexer<
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
         }
-        if (!transition.inputSymbol) {
-          throw new Error(
-            `inputSymbol cannot be falsy for transition: ${transition}`,
-          );
-        }
-        symbolBitmaskArray[unicode] |=
+        bitmaskArray[unicode] |=
           bitmasks?.[transition.currentState] ?? 0xffffffff;
         this.unicodeCharacterMap[unicode] = transition.inputSymbol;
       }
     }
 
-    return symbolBitmaskArray;
+    return bitmaskArray;
   }
 
   /**
