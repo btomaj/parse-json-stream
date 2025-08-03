@@ -26,7 +26,6 @@ export enum JSONValue {
  * | `FALSE`       | `f`                   | Start of a false literal       |
  * | `NULL`        | `n`                   | Start of a null literal        |
  * | `ESCAPE`      | `\`                   | Escape character               |
- * | `EXPONENTIAL` | `e`, `E`              | Exponential notation character |
  * | `WHITESPACE`  | ` `, `\t`, `\n`, `\r` | Whitespace                     |
  *
  * @enum {symbol}
@@ -135,7 +134,7 @@ export abstract class Lexer<
     super(transitions, initialState);
 
     this.stateBitmasks = this.createStateBitmasks(transitions);
-    this.unicodeCharacterFlags = this.createSymbolFlags(
+    this.unicodeCharacterFlags = this.createLexicalRuleFlags(
       transitions,
       this.stateBitmasks,
     );
@@ -168,7 +167,7 @@ export abstract class Lexer<
     return stateBitmasks;
   }
 
-  private createSymbolFlags(
+  private createLexicalRuleFlags(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     bitmasks: Record<State[keyof State], number>,
   ): Uint8Array | Uint16Array | Uint32Array {

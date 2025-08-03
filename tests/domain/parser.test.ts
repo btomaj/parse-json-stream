@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { JSONChunk } from "~/lib/domain/chunk";
 import {
-  JSONTokenType,
+  JSONSymbol,
   JSONValue,
   Lexer,
   type LexerToken,
@@ -157,19 +157,14 @@ describe("DPDA", () => {
 });
 
 describe("JSONParser", () => {
-  class FakeLexer extends Lexer<typeof JSONValue, typeof JSONTokenType> {
-    returnTokens: Array<LexerToken<typeof JSONValue, typeof JSONTokenType>> =
-      [];
+  class FakeLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
+    returnTokens: Array<LexerToken<typeof JSONValue, typeof JSONSymbol>> = [];
 
-    constructor(
-      states = JSONValue,
-      transitions = JSONTransitions,
-      initialState = JSONValue.None,
-    ) {
-      super(states, transitions, initialState);
+    constructor(transitions = JSONTransitions, initialState = JSONValue.None) {
+      super(transitions, initialState);
     }
 
-    setReturnToken(token: LexerToken<typeof JSONValue, typeof JSONTokenType>) {
+    setReturnToken(token: LexerToken<typeof JSONValue, typeof JSONSymbol>) {
       this.returnTokens.push(token);
     }
 
@@ -196,7 +191,12 @@ describe("JSONParser", () => {
     const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
       JSONValue.None,
     ]);
-    lexer.setReturnToken({ type: JSONValue.String, lexeme: '"' });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      buffer: "hello",
+      start: 0,
+      end: 5,
+    });
 
     // Act
     const chunks = [];
@@ -210,40 +210,51 @@ describe("JSONParser", () => {
 
   it("should set and increment array index", async () => {
     // Arrange
+    const buffer = "[1,2]";
     const lexer = new FakeLexer();
     lexer.setReturnToken({
-      type: JSONValue.Array,
-      symbol: JSONTokenType.LBracket,
-      lexeme: "[",
+      type: JSONValue.None,
+      symbol: JSONSymbol.LBracket,
+      buffer,
+      start: 0,
+      end: 1,
     });
-    lexer.setReturnToken({ type: JSONValue.Number, lexeme: "1" });
     lexer.setReturnToken({
-      type: JSONValue.Array,
-      symbol: JSONTokenType.Comma,
-      lexeme: ",",
+      type: JSONValue.Number,
+      buffer,
+      start: 1,
+      end: 2,
     });
-    lexer.setReturnToken({ type: JSONValue.Number, lexeme: "2" });
     lexer.setReturnToken({
-      type: JSONValue.Array,
-      symbol: JSONTokenType.RBracket,
-      lexeme: "]",
+      type: JSONValue.None,
+      symbol: JSONSymbol.Comma,
+      buffer,
+      start: 2,
+      end: 3,
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Number,
+      buffer,
+      start: 3,
+      end: 4,
+    });
+    lexer.setReturnToken({
+      type: JSONValue.None,
+      symbol: JSONSymbol.RBracket,
+      buffer,
+      start: 4,
+      end: 5,
     });
     const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
       JSONValue.None,
     ]);
 
     // Act
-    const chunks = [];
-    for await (const chunk of parser.parse("[1,2]")) {
-      chunks.push(chunk);
-    }
+    const chunks = Array.from(parser.parse(buffer));
 
     // Assert
-    expect(chunks[0].segments).toEqual(["0"]);
-    expect(chunks[1].segments).toEqual(["0"]);
-    expect(chunks[2].segments).toEqual(["1"]);
-    expect(chunks[3].segments).toEqual(["1"]);
-    expect(chunks[4].segments).toEqual([]);
+    expect(chunks[0].segments).toEqual([0]);
+    expect(chunks[1].segments).toEqual([1]);
   });
 
   it("should set object key", async () => {
@@ -251,40 +262,36 @@ describe("JSONParser", () => {
     const lexer = new FakeLexer();
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.LBrace,
-      lexeme: "{",
+      symbol: JSONSymbol.LBrace,
+      buffer: '{"key":"value"}',
+      start: 0,
+      end: 1,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
-    });
-    lexer.setReturnToken({ type: JSONValue.String, lexeme: "key" });
-    lexer.setReturnToken({
-      type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
+      buffer: '{"key":"value"}',
+      start: 2,
+      end: 5,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.Colon,
-      lexeme: ":",
+      symbol: JSONSymbol.Colon,
+      buffer: '{"key":"value"}',
+      start: 6,
+      end: 7,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
-    });
-    lexer.setReturnToken({ type: JSONValue.String, lexeme: "value" });
-    lexer.setReturnToken({
-      type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
+      buffer: '{"key":"value"}',
+      start: 8,
+      end: 13,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.RBrace,
-      lexeme: "}",
+      symbol: JSONSymbol.RBrace,
+      buffer: '{"key":"value"}',
+      start: 14,
+      end: 15,
     });
     const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
       JSONValue.None,
@@ -297,12 +304,7 @@ describe("JSONParser", () => {
     }
 
     // Assert
-    expect(chunks[2].segments).toEqual([]);
-    expect(chunks[3].segments).toEqual(["key"]);
-    expect(chunks[5].segments).toEqual(["key"]);
-    expect(chunks[6].segments).toEqual(["key"]);
-    expect(chunks[7].segments).toEqual(["key"]);
-    expect(chunks[8].segments).toEqual([]);
+    expect(chunks[0].segments).toEqual(["key"]);
   });
 
   it("should remove path segments when nesting shrinks", async () => {
@@ -310,77 +312,73 @@ describe("JSONParser", () => {
     const lexer = new FakeLexer();
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.LBrace,
-      lexeme: "{",
+      symbol: JSONSymbol.LBrace,
+      buffer: '{"key":[1,1]}',
+      start: 0,
+      end: 1,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
-    });
-    lexer.setReturnToken({
-      type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: "key",
-    });
-    lexer.setReturnToken({
-      type: JSONValue.String,
-      symbol: JSONTokenType.String,
-      lexeme: '"',
+      buffer: '{"key":[1,1]}',
+      start: 2,
+      end: 5,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.Colon,
-      lexeme: ":",
+      symbol: JSONSymbol.Colon,
+      buffer: '{"key":[1,1]}',
+      start: 6,
+      end: 7,
     });
     lexer.setReturnToken({
       type: JSONValue.Array,
-      symbol: JSONTokenType.LBracket,
-      lexeme: "[",
+      symbol: JSONSymbol.LBracket,
+      buffer: '{"key":[1,1]}',
+      start: 7,
+      end: 8,
     });
     lexer.setReturnToken({
       type: JSONValue.Number,
-      symbol: JSONTokenType.Digit,
-      lexeme: "1",
+      buffer: '{"key":[1,1]}',
+      start: 8,
+      end: 9,
     });
     lexer.setReturnToken({
       type: JSONValue.Array,
-      symbol: JSONTokenType.Comma,
-      lexeme: ",",
+      symbol: JSONSymbol.Comma,
+      buffer: '{"key":[1,1]}',
+      start: 9,
+      end: 10,
     });
     lexer.setReturnToken({
       type: JSONValue.Number,
-      symbol: JSONTokenType.Digit,
-      lexeme: "1",
+      buffer: '{"key":[1,1]}',
+      start: 10,
+      end: 11,
     });
     lexer.setReturnToken({
       type: JSONValue.Array,
-      symbol: JSONTokenType.RBracket,
-      lexeme: "]",
+      symbol: JSONSymbol.RBracket,
+      buffer: '{"key":[1,1]}',
+      start: 11,
+      end: 12,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONTokenType.RBrace,
-      lexeme: "}",
+      symbol: JSONSymbol.RBrace,
+      buffer: '{"key":[1,1]}',
+      start: 12,
+      end: 13,
     });
     const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
       JSONValue.None,
     ]);
 
     // Act
-    const chunks = [];
-    for await (const chunk of parser.parse('{"key":[1,1]}')) {
-      chunks.push(chunk);
-    }
+    const chunks = Array.from(parser.parse('{"key":[1,1]}'));
 
     // Assert
-    expect(chunks[2].segments).toEqual([]);
-    expect(chunks[3].segments).toEqual(["key"]);
-    expect(chunks[5].segments).toEqual(["key", 0]);
-    expect(chunks[6].segments).toEqual(["key", 0]);
-    expect(chunks[7].segments).toEqual(["key", 1]);
-    expect(chunks[8].segments).toEqual(["key", 1]);
-    expect(chunks[9].segments).toEqual(["key"]);
-    expect(chunks[10].segments).toEqual([]);
+    expect(chunks[0].segments).toEqual(["key", 0]);
+    expect(chunks[1].segments).toEqual(["key", 1]);
   });
 });

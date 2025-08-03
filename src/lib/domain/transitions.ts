@@ -7,24 +7,18 @@ export class JSONTransition extends DPDATransition<
   JSONValue
 > {}
 
-/**
- * When currentState is Object, and stackTop is Object, we're looking for a key
- * When currentState is String, and stackTop is Object, we have a key
- * When currentState is String, and stackTop is String, we have a string value
- * When currentState is None, and stackTop is Object, we're looking for a value
- */
 const objectTransitions: Array<JSONTransition> = [
   // Open object (JSON element is an object)
   new JSONTransition(
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.LBrace, // we find a left brace
     JSONValue.None, // without context,
-    JSONValue.Object, // so we're looking for a key, and
+    JSONValue.None, // so we're looking for a key, and
     [JSONValue.None, JSONValue.Object], // we step inside the object
   ),
   // Close empty object
   new JSONTransition(
-    JSONValue.Object, // We're waiting for a key, and
+    JSONValue.None, // We're waiting for a key, and
     JSONSymbol.RBrace, // we find a right brace
     JSONValue.Object, // inside an object,
     JSONValue.None, // so we're looking for a value, and
@@ -40,7 +34,7 @@ const objectTransitions: Array<JSONTransition> = [
   ),
   // Open object key
   new JSONTransition(
-    JSONValue.Object, // We're waiting for a key, and
+    JSONValue.None, // We're waiting for a key, and
     JSONSymbol.String, // we find a quotation mark
     JSONValue.Object, // inside an object,
     JSONValue.String, // so we've found a key, and

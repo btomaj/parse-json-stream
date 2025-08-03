@@ -1,8 +1,10 @@
-import invariant from "tiny-invariant";
 import { JSONChunk } from "~/lib/domain/chunk";
-import { FSMTransition, type Lexer } from "~/lib/domain/lexer";
-import { JSONTokenType } from "~/lib/domain/lexer";
-import { JSONValue } from "~/lib/domain/lexer";
+import {
+  FSMTransition,
+  JSONSymbol,
+  JSONValue,
+  type Lexer,
+} from "~/lib/domain/lexer";
 import type { JSONTransition } from "./transitions";
 
 export class DPDATransition<State, Input, Stack> extends FSMTransition<
@@ -112,16 +114,15 @@ export abstract class DPDA<
  * metadata. E.g. ["key", 0, "key"], and "string...".
  */
 /**
- * A JSON parser that consumes LexerTokens and produces JSONValues. The primary
- * concern of JSONParserUseCase is to maintain nesting metadata from the JSON
- * stream.
+ * A JSON parser that consumes LexerTokens and produces JSONChunks. The primary
+ * concern of JSONParser is to maintain nesting metadata from the JSON stream.
  */
 export class JSONParser extends DPDA<
   typeof JSONValue,
-  typeof JSONTokenType,
+  typeof JSONSymbol,
   typeof JSONValue
 > {
-  private lexer: Lexer<typeof JSONValue, typeof JSONTokenType>;
+  private lexer: Lexer<typeof JSONValue, typeof JSONSymbol>;
   private path: Array<string | number> = [];
 
   /**
@@ -132,7 +133,7 @@ export class JSONParser extends DPDA<
    * @param {Array<JSONTokenType>} initialStack The initial stack of the parser.
    */
   constructor(
-    lexer: Lexer<typeof JSONValue, typeof JSONTokenType>,
+    lexer: Lexer<typeof JSONValue, typeof JSONSymbol>,
     transitions: Array<JSONTransition>,
     initialState: JSONValue,
     initialStack: Array<JSONValue>,
@@ -146,62 +147,68 @@ export class JSONParser extends DPDA<
    * @private
    */
   private keyBuffer = "";
+  private isBufferingKey = false;
 
   /**
    * Parses a chunk of JSON data from a stream.
    * @param {string} chunk A chunk of JSON data to parse.
    * @generator
    */
-  async *parse(chunk: string): AsyncGenerator<JSONChunk> {
+  *parse(chunk: string): Generator<JSONChunk> {
     const tokens = this.lexer.tokenise(chunk);
 
-    for await (const token of tokens) {
+    for (const token of tokens) {
       if (token.symbol) {
-        const transition = this.transition(token.symbol);
+        this.transition(token.symbol);
 
-        if (this.stack.length > this.path.length) {
-          if (transition.stackTop === JSONValue.Array) {
+        if (this.stack.length > this.path.length + 1) {
+          if (this.stack[this.stack.length - 1] === JSONValue.Array) {
             this.path.push(0);
             continue;
           }
-          if (transition.stackTop === JSONValue.Object) {
+          if (this.stack[this.stack.length - 1] === JSONValue.Object) {
             this.path.push("");
+            this.keyBuffer = "";
+            this.isBufferingKey = true;
             continue;
           }
-        }
-
-        if (this.stack.length < this.path.length) {
+        } else if (this.stack.length < this.path.length) {
           this.path.pop();
           continue;
         }
 
-        // Handle array element transitions
         if (
-          transition.stackTop === JSONValue.Array &&
-          transition.inputSymbol === JSONTokenType.Comma
+          token.symbol === JSONSymbol.Comma &&
+          this.stack[this.stack.length - 1] === JSONValue.Array
         ) {
-          this.path[this.path.length - 1] += 1;
-        }
-
-        if (
-          transition.stackTop === JSONValue.Object &&
-          transition.currentState === JSONValue.String
+          (this.path[this.path.length - 1] as number) += 1;
+        } else if (
+          token.symbol === JSONSymbol.Comma &&
+          this.stack[this.stack.length - 1] === JSONValue.Object
         ) {
-          this.keyBuffer += token.lexeme;
-          continue;
-        }
-
-        if (
-          transition.stackTop === JSONValue.Object &&
-          transition.currentState === JSONTokenType.String &&
-          transition.inputSymbol === JSONTokenType.String
+          this.keyBuffer = "";
+          this.isBufferingKey = true;
+        } else if (
+          token.symbol === JSONSymbol.Colon &&
+          this.stack[this.stack.length - 1] === JSONValue.Object
         ) {
           this.path[this.path.length - 1] = this.keyBuffer;
-          this.keyBuffer = "";
+          this.isBufferingKey = false;
         }
+
+        continue;
       }
 
-      yield new JSONChunk(token.lexeme, token.type, [...this.path]);
+      if (this.isBufferingKey && token.type === JSONValue.String) {
+        this.keyBuffer += token.buffer.slice(token.start, token.end);
+        continue;
+      }
+
+      yield new JSONChunk(
+        token.buffer.slice(token.start, token.end),
+        token.type,
+        [...this.path],
+      );
     }
   }
 }
