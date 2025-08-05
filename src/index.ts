@@ -1,4 +1,4 @@
-import { JSONLexer, JSONSymbol, JSONValue } from "~/lib/domain/lexer";
+import { JSONLexer, JSONValue } from "~/lib/domain/lexer";
 import { JSONParser } from "~/lib/domain/parser";
 import { StreamProcessorFactory } from "~/lib/infrastructure/stream-adapter";
 import { JSONTransitions } from "./lib/domain/transitions";
@@ -16,12 +16,8 @@ export function parseStream(
     | WebSocket
     | AsyncIterable<string | Uint8Array | ArrayBuffer>,
 ): void {
-  const lexer = new JSONLexer(
-    JSONSymbol,
-    JSONTransitions,
-    JSONSymbol.Whitespace,
-  );
-  const parser = new JSONParser(lexer, JSONTransitions, JSONSymbol.Whitespace, [
+  const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+  const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
     JSONValue.None,
   ]);
 
