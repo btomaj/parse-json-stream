@@ -56,9 +56,37 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
 }
 
 export class EventSourceProcessor implements AsyncIterable<string> {
+  private eventSource: EventSource;
   private abortController = new AbortController();
+  private resolvePromise: (value: string | null) => void;
+  private rejectPromise: (error: Error) => void;
 
-  constructor(private eventSource: EventSource) {}
+  constructor(eventSource: EventSource) {
+    this.eventSource = eventSource;
+
+    this.eventSource.onmessage = (event) => {
+      this.resolvePromise(event.data);
+    };
+
+    this.eventSource.onerror = () => {
+      if (this.eventSource.readyState === EventSource.CLOSED) {
+        this.resolvePromise(null); // signal end
+      } else {
+        this.rejectPromise(new Error("Server-side event error"));
+      }
+    };
+
+    this.resolvePromise = () => {
+      throw new Error(
+        "Server-side event received before EventSourceProcessor iterator initialised resolvePromise method",
+      );
+    };
+    this.rejectPromise = () => {
+      throw new Error(
+        "Server-side event received before EventSourceProcessor iterator initialised rejectPromise method",
+      );
+    };
+  }
 
   stop(): void {
     this.abortController.abort();
@@ -66,47 +94,14 @@ export class EventSourceProcessor implements AsyncIterable<string> {
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
-    let resolveNext: ((value: string | null) => void) | null = null;
-    let rejectNext: ((error: Error) => void) | null = null;
-    let ended = false;
-
-    this.eventSource.onmessage = (event) => {
-      if (resolveNext) {
-        resolveNext(event.data);
-        resolveNext = null;
-        rejectNext = null;
-      }
-    };
-
-    this.eventSource.onerror = () => {
-      const CLOSED =
-        typeof EventSource !== "undefined" ? EventSource.CLOSED : 2;
-      if (this.eventSource.readyState === CLOSED) {
-        ended = true;
-        if (resolveNext) {
-          resolveNext(null); // Signal end
-          resolveNext = null;
-          rejectNext = null;
-        }
-      } else {
-        const error = new Error("EventSource error");
-        if (rejectNext) {
-          rejectNext(error);
-          resolveNext = null;
-          rejectNext = null;
-        }
-      }
-    };
-
     try {
-      while (!ended && !this.abortController.signal.aborted) {
+      while (
+        this.eventSource.readyState !== EventSource.CLOSED &&
+        !this.abortController.signal.aborted
+      ) {
         const message = await new Promise<string | null>((resolve, reject) => {
-          if (this.abortController.signal.aborted) {
-            resolve(null);
-            return;
-          }
-          resolveNext = resolve;
-          rejectNext = reject;
+          this.resolvePromise = resolve;
+          this.rejectPromise = reject;
         });
 
         if (message === null || this.abortController.signal.aborted) {
@@ -115,6 +110,7 @@ export class EventSourceProcessor implements AsyncIterable<string> {
         yield message;
       }
     } finally {
+      // garbage collection
       this.eventSource.onmessage = null;
       this.eventSource.onerror = null;
     }

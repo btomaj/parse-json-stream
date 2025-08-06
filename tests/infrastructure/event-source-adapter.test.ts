@@ -1,170 +1,167 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventSourceProcessor } from "~/lib/infrastructure/stream-adapter";
 
-class StubEventSource extends EventSource {
-  constructor(private _readyState: number) {
-    super("http://test");
-  }
+class StubEventSource implements EventSource {
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+  onopen: ((event: Event) => void) | null = null;
+
+  CONNECTING = EventSource.CONNECTING;
+  OPEN = EventSource.OPEN;
+  CLOSED = EventSource.CLOSED;
+
+  constructor(private _readyState: number) {}
 
   get readyState(): number {
     return this._readyState;
   }
 
-  close = vi.fn();
+  get url(): string {
+    return "test";
+  }
+
+  close = vi.fn().mockImplementation(() => {
+    setTimeout(() => {
+      this._readyState = EventSource.CLOSED;
+      this.onerror?.(new Event("error"));
+    });
+  });
+
+  dispatchEvent(event: Event): boolean {
+    setTimeout(() => {
+      switch (event.type) {
+        case "message":
+          this.onmessage?.(event as MessageEvent);
+          break;
+        case "error":
+          this.onerror?.(event);
+          break;
+        case "open":
+          this.onopen?.(event);
+          break;
+      }
+    });
+    return true;
+  }
+
+  addEventListener(): void {}
+
+  removeEventListener(): void {}
+
+  withCredentials: boolean = false;
 }
 
-describe("EventSourceAdapter", () => {
-  const chunkCallback = vi.fn();
-  const endCallback = vi.fn();
-  const errorCallback = vi.fn();
+beforeEach(() => vi.resetAllMocks());
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
+it("should handle messages", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const adapter = new EventSourceProcessor(stubEventSource);
+  const messages: Array<string> = [];
 
-  describe("Message Handling", () => {
-    it("should handle multiple messages", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onChunk(chunkCallback);
+  // Act
+  stubEventSource.dispatchEvent(new MessageEvent("message", { data: "1" }));
+  stubEventSource.dispatchEvent(new MessageEvent("message", { data: "" }));
+  stubEventSource.dispatchEvent(new MessageEvent("message", { data: "2" }));
+  stubEventSource.close();
 
-      adapter.start();
-      stubEventSource.onmessage?.(
-        new MessageEvent("message", { data: "first" }),
-      );
-      stubEventSource.onmessage?.(new MessageEvent("message", { data: "" }));
+  for await (const message of adapter) {
+    messages.push(message);
+  }
 
-      expect(chunkCallback).toHaveBeenCalledWith("first");
-      expect(chunkCallback).toHaveBeenCalledWith("");
-      expect(chunkCallback).toHaveBeenCalledTimes(2);
-    });
-  });
+  // Assert
+  expect(messages).toEqual(["1", "", "2"]);
+});
 
-  describe("Error Handling", () => {
-    it("should call endCallback when EventSource is closed", () => {
-      const stubEventSource = new StubEventSource(2); // EventSource.CLOSED
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onEnd(endCallback);
-      adapter.onError(errorCallback);
+it("should end iteration when EventSource is closed", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(2); // EventSource.CLOSED
+  const adapter = new EventSourceProcessor(stubEventSource);
+  const messages: Array<string> = [];
 
-      adapter.start();
-      stubEventSource.onerror?.(new Event("error"));
+  // Act
+  stubEventSource.close();
+  stubEventSource.dispatchEvent(new MessageEvent("message", { data: "1" }));
+  for await (const message of adapter) {
+    messages.push(message);
+  }
 
-      expect(endCallback).toHaveBeenCalled();
-      expect(errorCallback).not.toHaveBeenCalled();
-    });
+  // Assert
+  expect(messages).toEqual([]);
+});
 
-    it("should call errorCallback when EventSource has error but not closed", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onError(errorCallback);
+it("should throw error when EventSource is connecting", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(0); // EventSource.CONNECTING
+  const adapter = new EventSourceProcessor(stubEventSource);
 
-      adapter.start();
-      stubEventSource.onerror?.(new Event("error"));
+  // Act
+  stubEventSource.dispatchEvent(new Event("error"));
+  const messages = [];
 
-      expect(errorCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "EventSource error",
-        }),
-      );
-      expect(endCallback).not.toHaveBeenCalled();
-    });
+  // Assert
+  await expect(async () => {
+    for await (const message of adapter) {
+      messages.push(message);
+    }
+  }).rejects.toThrow("Server-side event error");
+});
 
-    it("should call errorCallback when EventSource is connecting", () => {
-      const stubEventSource = new StubEventSource(0); // EventSource.CONNECTING
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onError(errorCallback);
+it("should throw error when EventSource has error", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const adapter = new EventSourceProcessor(stubEventSource);
+  const messages: Array<string> = [];
 
-      adapter.start();
-      stubEventSource.onerror?.(new Event("error"));
+  // Act
+  stubEventSource.dispatchEvent(
+    new MessageEvent("message", { data: "success" }),
+  );
+  stubEventSource.dispatchEvent(new Event("error"));
 
-      expect(errorCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "EventSource error",
-        }),
-      );
-    });
+  // Assert
+  await expect(async () => {
+    for await (const message of adapter) {
+      messages.push(message);
+    }
+  }).rejects.toThrow("Server-side event error");
+  expect(messages).toEqual(["success"]);
+});
 
-    it("should handle error after successful messages", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onChunk(chunkCallback);
-      adapter.onError(errorCallback);
+it("should close EventSource when stop() is called on EventSourceProcessor before iteration", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const adapter = new EventSourceProcessor(stubEventSource);
 
-      adapter.start();
-      stubEventSource.onmessage?.(
-        new MessageEvent("message", { data: "success" }),
-      );
-      stubEventSource.onerror?.(new Event("error"));
+  // Act
+  expect(() => adapter.stop()).not.toThrow();
+  expect(() => adapter.stop()).not.toThrow(); // Assert
+  for await (const _ of adapter) {
+    // initialise the iterator to avoid initialisation errors
+  }
 
-      expect(chunkCallback).toHaveBeenCalledWith("success");
-      expect(errorCallback).toHaveBeenCalled();
-    });
-  });
+  // Assert
+  expect(stubEventSource.close).toHaveBeenCalledTimes(2);
+});
 
-  describe("Stream Control", () => {
-    it("should close EventSource when stop() is called", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
+it("should close EventSource when stop() is called on EventSourceProcessor during iteration", async () => {
+  // Arrange
+  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const adapter = new EventSourceProcessor(stubEventSource);
+  const messages: string[] = [];
 
-      adapter.start();
-      adapter.stop();
+  // Act
+  stubEventSource.dispatchEvent(
+    new MessageEvent("message", { data: "before" }),
+  );
+  setTimeout(() => adapter.stop());
+  stubEventSource.dispatchEvent(new MessageEvent("message", { data: "after" }));
 
-      expect(stubEventSource.close).toHaveBeenCalled();
-    });
+  for await (const message of adapter) {
+    messages.push(message);
+  }
 
-    it("should handle stop() before start()", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-
-      expect(() => adapter.stop()).not.toThrow();
-      expect(stubEventSource.close).toHaveBeenCalled();
-    });
-
-    it("should handle multiple stop() calls", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onChunk(chunkCallback);
-      adapter.onEnd(endCallback);
-      adapter.onError(errorCallback);
-
-      adapter.start();
-      adapter.stop();
-      adapter.stop();
-
-      expect(stubEventSource.close).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe("Callback Registration", () => {
-    it("should work without callbacks registered", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-
-      expect(() => adapter.start()).not.toThrow();
-      expect(() =>
-        stubEventSource.onmessage?.(new MessageEvent("message")),
-      ).not.toThrow();
-    });
-
-    it("should allow callback changes between messages", () => {
-      const stubEventSource = new StubEventSource(1); // EventSource.OPEN
-      const adapter = new EventSourceProcessor(stubEventSource);
-      adapter.onChunk(chunkCallback);
-
-      adapter.start();
-      stubEventSource.onmessage?.(
-        new MessageEvent("message", { data: "first" }),
-      );
-
-      const newChunkCallback = vi.fn();
-      adapter.onChunk(newChunkCallback);
-      stubEventSource.onmessage?.(
-        new MessageEvent("message", { data: "second" }),
-      );
-
-      expect(chunkCallback).toHaveBeenCalledWith("first");
-      expect(newChunkCallback).toHaveBeenCalledWith("second");
-    });
-  });
+  // Assert
+  expect(messages).toEqual(["before"]);
+  expect(stubEventSource.close).toHaveBeenCalled();
 });
