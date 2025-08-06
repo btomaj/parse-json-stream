@@ -25,19 +25,10 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
           break;
         }
 
-        const chunk = this.decodeChunk(value);
-        yield chunk;
-      }
-    } catch (error) {
-      if (!this.abortController.signal.aborted) {
-        throw error;
+        yield this.decodeChunk(value);
       }
     } finally {
-      try {
-        this.reader.releaseLock();
-      } catch {
-        // Ignore errors when releasing lock
-      }
+      this.reader.releaseLock();
     }
   }
 

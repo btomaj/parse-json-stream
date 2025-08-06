@@ -1,184 +1,119 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import { ReadableStreamProcessor } from "~/lib/infrastructure/stream-adapter";
 
-class MockReadableStream extends ReadableStream<string> {
-  public mockReader = {
-    read: vi.fn(),
-    cancel: vi.fn(),
-    releaseLock: vi.fn(),
-    closed: new Promise<void>((resolve) => resolve()),
-  };
+class MockReadableStream<T = string> extends ReadableStream<T> {
+  private controller!: ReadableStreamDefaultController<T>;
 
-  getReader() {
-    return this.mockReader;
+  constructor() {
+    let controllerRef!: ReadableStreamDefaultController<T>;
+
+    super({
+      start(controller) {
+        controllerRef = controller;
+      },
+    });
+
+    this.controller = controllerRef;
+  }
+
+  enqueue(chunk: T) {
+    this.controller.enqueue(chunk);
+  }
+
+  error(error: Error) {
+    this.controller.error(error);
+  }
+
+  close() {
+    this.controller.close();
   }
 }
 
-describe("ReadableStreamAdapter", () => {
-  const chunkCallback = vi.fn();
-  const endCallback = vi.fn();
-  const errorCallback = vi.fn();
+it("should handle string values", async () => {
+  // Arrange
+  const mockReadableStream = new MockReadableStream();
+  const adapter = new ReadableStreamProcessor(mockReadableStream);
+  const chunks: Array<string> = [];
 
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
+  // Act
+  mockReadableStream.enqueue("");
+  mockReadableStream.enqueue("hello");
+  mockReadableStream.close();
+  for await (const chunk of adapter) {
+    chunks.push(chunk);
+  }
 
-  describe("String Chunks", () => {
-    it("should handle multiple string chunks", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onChunk(chunkCallback);
-      adapter.onEnd(endCallback);
-
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "hel",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "lo",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({ done: true });
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(chunkCallback).toHaveBeenCalledWith("hel");
-      expect(chunkCallback).toHaveBeenCalledWith("lo");
-      expect(endCallback).toHaveBeenCalled();
-    });
-
-    it("should handle empty string chunks", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onChunk(chunkCallback);
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "test",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({ done: true });
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(chunkCallback).toHaveBeenCalledWith("");
-      expect(chunkCallback).toHaveBeenCalledWith("test");
-    });
-  });
-
-  describe("Error Handling", () => {
-    it("should handle read errors", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onError(errorCallback);
-      const error = new Error("Read failed");
-      mockStream.mockReader.read.mockRejectedValueOnce(error);
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(errorCallback).toHaveBeenCalledWith(error);
-    });
-
-    it("should handle unsupported chunk types", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onError(errorCallback);
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: 123,
-      });
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(errorCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining("Unsupported chunk type"),
-        }),
-      );
-    });
-  });
-
-  describe("Stream Control", () => {
-    it("should stop and cancel reader when stop() is called", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      mockStream.mockReader.read.mockResolvedValue({
-        done: false,
-        value: "test",
-      });
-
-      adapter.start();
-      adapter.stop();
-
-      expect(mockStream.mockReader.cancel).toHaveBeenCalled();
-    });
-
-    it("should handle stop() before start()", () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-
-      expect(() => adapter.stop()).not.toThrow();
-    });
-  });
-
-  describe("Callback Registration", () => {
-    it("should work without callbacks registered", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "test",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({ done: true });
-
-      expect(() => adapter.start()).not.toThrow();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    it("should allow callback changes between chunks", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onChunk(chunkCallback);
-      const newChunkCallback = vi.fn();
-      mockStream.mockReader.read
-        .mockResolvedValueOnce({ done: false, value: "first" })
-        .mockImplementationOnce(async () => {
-          adapter.onChunk(newChunkCallback);
-          return { done: false, value: "second" };
-        })
-        .mockResolvedValueOnce({ done: true });
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(chunkCallback).toHaveBeenCalledWith("first");
-      expect(newChunkCallback).toHaveBeenCalledWith("second");
-    });
-  });
-
-  describe("Stream Completion", () => {
-    it("should call endCallback after final chunk", async () => {
-      const mockStream = new MockReadableStream();
-      const adapter = new ReadableStreamProcessor(mockStream);
-      adapter.onChunk(chunkCallback);
-      adapter.onEnd(endCallback);
-      mockStream.mockReader.read.mockResolvedValueOnce({
-        done: false,
-        value: "final",
-      });
-      mockStream.mockReader.read.mockResolvedValueOnce({ done: true });
-
-      adapter.start();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-
-      expect(chunkCallback).toHaveBeenCalledWith("final");
-      expect(endCallback).toHaveBeenCalled();
-    });
-  });
+  // Assert
+  expect(chunks).toEqual(["", "hello"]);
 });
+
+it("should handle Uint8Array values", async () => {
+  // Arrange
+  const mockReadableStream = new MockReadableStream<Uint8Array>();
+  const adapter = new ReadableStreamProcessor(mockReadableStream);
+  const chunks: Array<string> = [];
+  const textEncoder = new TextEncoder();
+
+  // Act
+  mockReadableStream.enqueue(textEncoder.encode("hello"));
+  mockReadableStream.close();
+  for await (const chunk of adapter) {
+    chunks.push(chunk);
+  }
+
+  // Assert
+  expect(chunks).toEqual(["hello"]);
+});
+
+it("should handle ArrayBuffer values", async () => {
+  // Arrange
+  const mockReadableStream = new MockReadableStream<ArrayBuffer>();
+  const adapter = new ReadableStreamProcessor(mockReadableStream);
+  const chunks: Array<string> = [];
+  const textEncoder = new TextEncoder();
+
+  // Act
+  mockReadableStream.enqueue(textEncoder.encode("world").buffer);
+  mockReadableStream.close();
+  for await (const chunk of adapter) {
+    chunks.push(chunk);
+  }
+
+  // Assert
+  expect(chunks).toEqual(["world"]);
+});
+
+it("should handle stream errors", async () => {
+  // Arrange
+  const mockReadableStream = new MockReadableStream();
+  const adapter = new ReadableStreamProcessor(mockReadableStream);
+  const errorMessage = "test error";
+
+  // Act
+  mockReadableStream.error(new Error(errorMessage));
+
+  // Assert
+  await expect(async () => {
+    for await (const _ of adapter) {
+      // Should not reach here
+    }
+  }).rejects.toThrow(errorMessage);
+});
+
+it.for([[123], [undefined], [null], [true], [false], [{ key: "value" }]])(
+  "should error on a %s value",
+  async ([value]) => {
+    // Arrange
+    const mockReadableStream = new MockReadableStream();
+    const adapter = new ReadableStreamProcessor(mockReadableStream);
+    // @ts-ignore
+    mockReadableStream.enqueue(value);
+    mockReadableStream.close();
+
+    await expect(async () => {
+      for await (const _ of adapter) {
+        // Should not reach here
+      }
+    }).rejects.toThrow("Unsupported chunk type");
+  },
+);
