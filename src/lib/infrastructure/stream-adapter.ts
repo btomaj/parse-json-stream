@@ -198,31 +198,25 @@ export class WebSocketProcessor implements AsyncIterable<string> {
 }
 
 export class AsyncIterableProcessor implements AsyncIterable<string> {
+  private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>;
   private abortController = new AbortController();
   private decoder = new TextDecoder();
 
-  constructor(
-    private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ) {}
+  constructor(asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>) {
+    this.asyncIterable = asyncIterable;
+  }
 
   stop(): void {
     this.abortController.abort();
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
-    try {
-      for await (const chunk of this.asyncIterable) {
-        if (this.abortController.signal.aborted) {
-          break;
-        }
+    for await (const chunk of this.asyncIterable) {
+      if (this.abortController.signal.aborted) {
+        return;
+      }
 
-        const decodedChunk = this.decodeChunk(chunk);
-        yield decodedChunk;
-      }
-    } catch (error) {
-      if (!this.abortController.signal.aborted) {
-        throw error;
-      }
+      yield this.decodeChunk(chunk);
     }
   }
 

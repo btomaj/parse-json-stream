@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, expect, it, vi } from "vitest";
 import { EventSourceProcessor } from "~/lib/infrastructure/stream-adapter";
 
 class StubEventSource implements EventSource {
@@ -17,7 +17,7 @@ class StubEventSource implements EventSource {
   }
 
   get url(): string {
-    return "test";
+    return "";
   }
 
   close = vi.fn().mockImplementation(() => {
