@@ -1,19 +1,9 @@
-export interface StreamProcessor {
-  onChunk(callback: (chunk: string) => void): void;
-  onEnd(callback: () => void): void;
-  onError(callback: (error: Error) => void): void;
-  start(): void;
-  stop(): void;
-}
-
-export class ReadableStreamProcessor implements StreamProcessor {
+export class ReadableStreamProcessor implements AsyncIterable<string> {
   private reader: ReadableStreamDefaultReader<
     string | Uint8Array | ArrayBuffer
   >;
   private decoder = new TextDecoder();
-  private chunkCallback?: (chunk: string) => void;
-  private endCallback?: () => void;
-  private errorCallback?: (error: Error) => void;
+  private abortController = new AbortController();
 
   constructor(
     private stream: ReadableStream<string | Uint8Array | ArrayBuffer>,
@@ -21,41 +11,33 @@ export class ReadableStreamProcessor implements StreamProcessor {
     this.reader = this.stream.getReader();
   }
 
-  onChunk(callback: (chunk: string) => void): void {
-    this.chunkCallback = callback;
-  }
-
-  onEnd(callback: () => void): void {
-    this.endCallback = callback;
-  }
-
-  onError(callback: (error: Error) => void): void {
-    this.errorCallback = callback;
-  }
-
-  start(): void {
-    this.read();
-  }
-
   stop(): void {
+    this.abortController.abort();
     this.reader.cancel();
   }
 
-  private async read(): Promise<void> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     try {
-      while (true) {
+      while (!this.abortController.signal.aborted) {
         const { done, value } = await this.reader.read();
 
         if (done) {
-          this.endCallback?.();
           break;
         }
 
         const chunk = this.decodeChunk(value);
-        this.chunkCallback?.(chunk);
+        yield chunk;
       }
     } catch (error) {
-      this.errorCallback?.(error as Error);
+      if (!this.abortController.signal.aborted) {
+        throw error;
+      }
+    } finally {
+      try {
+        this.reader.releaseLock();
+      } catch {
+        // Ignore errors when releasing lock
+      }
     }
   }
 
@@ -73,83 +55,136 @@ export class ReadableStreamProcessor implements StreamProcessor {
   }
 }
 
-export class EventSourceProcessor implements StreamProcessor {
-  private chunkCallback?: (chunk: string) => void;
-  private endCallback?: () => void;
-  private errorCallback?: (error: Error) => void;
+export class EventSourceProcessor implements AsyncIterable<string> {
+  private abortController = new AbortController();
 
   constructor(private eventSource: EventSource) {}
 
-  onChunk(callback: (chunk: string) => void): void {
-    this.chunkCallback = callback;
+  stop(): void {
+    this.abortController.abort();
+    this.eventSource.close();
   }
 
-  onEnd(callback: () => void): void {
-    this.endCallback = callback;
-  }
+  async *[Symbol.asyncIterator](): AsyncGenerator<string> {
+    let resolveNext: ((value: string | null) => void) | null = null;
+    let rejectNext: ((error: Error) => void) | null = null;
+    let ended = false;
 
-  onError(callback: (error: Error) => void): void {
-    this.errorCallback = callback;
-  }
-
-  start(): void {
     this.eventSource.onmessage = (event) => {
-      this.chunkCallback?.(event.data);
+      if (resolveNext) {
+        resolveNext(event.data);
+        resolveNext = null;
+        rejectNext = null;
+      }
     };
 
     this.eventSource.onerror = () => {
       const CLOSED =
         typeof EventSource !== "undefined" ? EventSource.CLOSED : 2;
       if (this.eventSource.readyState === CLOSED) {
-        this.endCallback?.();
+        ended = true;
+        if (resolveNext) {
+          resolveNext(null); // Signal end
+          resolveNext = null;
+          rejectNext = null;
+        }
       } else {
-        this.errorCallback?.(new Error("EventSource error"));
+        const error = new Error("EventSource error");
+        if (rejectNext) {
+          rejectNext(error);
+          resolveNext = null;
+          rejectNext = null;
+        }
       }
     };
-  }
 
-  stop(): void {
-    this.eventSource.close();
+    try {
+      while (!ended && !this.abortController.signal.aborted) {
+        const message = await new Promise<string | null>((resolve, reject) => {
+          if (this.abortController.signal.aborted) {
+            resolve(null);
+            return;
+          }
+          resolveNext = resolve;
+          rejectNext = reject;
+        });
+
+        if (message === null || this.abortController.signal.aborted) {
+          break;
+        }
+        yield message;
+      }
+    } finally {
+      this.eventSource.onmessage = null;
+      this.eventSource.onerror = null;
+    }
   }
 }
 
-export class WebSocketProcessor implements StreamProcessor {
-  private chunkCallback?: (chunk: string) => void;
-  private endCallback?: () => void;
-  private errorCallback?: (error: Error) => void;
+export class WebSocketProcessor implements AsyncIterable<string> {
   private decoder = new TextDecoder();
+  private abortController = new AbortController();
 
   constructor(private webSocket: WebSocket) {}
 
-  onChunk(callback: (chunk: string) => void): void {
-    this.chunkCallback = callback;
+  stop(): void {
+    this.abortController.abort();
+    this.webSocket.close();
   }
 
-  onEnd(callback: () => void): void {
-    this.endCallback = callback;
-  }
+  async *[Symbol.asyncIterator](): AsyncGenerator<string> {
+    let resolveNext: ((value: string | null) => void) | null = null;
+    let rejectNext: ((error: Error) => void) | null = null;
+    let ended = false;
 
-  onError(callback: (error: Error) => void): void {
-    this.errorCallback = callback;
-  }
-
-  start(): void {
     this.webSocket.onmessage = (event) => {
-      const chunk = this.decodeChunk(event.data);
-      this.chunkCallback?.(chunk);
+      if (resolveNext) {
+        const chunk = this.decodeChunk(event.data);
+        resolveNext(chunk);
+        resolveNext = null;
+        rejectNext = null;
+      }
     };
 
     this.webSocket.onclose = () => {
-      this.endCallback?.();
+      ended = true;
+      if (resolveNext) {
+        resolveNext(null); // Signal end
+        resolveNext = null;
+        rejectNext = null;
+      }
     };
 
     this.webSocket.onerror = () => {
-      this.errorCallback?.(new Error("WebSocket error"));
+      const error = new Error("WebSocket error");
+      if (rejectNext) {
+        rejectNext(error);
+        resolveNext = null;
+        rejectNext = null;
+      }
     };
-  }
 
-  stop(): void {
-    this.webSocket.close();
+    try {
+      while (!ended && !this.abortController.signal.aborted) {
+        const message = await new Promise<string | null>((resolve, reject) => {
+          if (this.abortController.signal.aborted) {
+            resolve(null);
+            return;
+          }
+          resolveNext = resolve;
+          rejectNext = reject;
+        });
+
+        if (message === null || this.abortController.signal.aborted) {
+          break;
+        }
+        yield message;
+      }
+    } finally {
+      this.webSocket.onmessage = null;
+      this.webSocket.onclose = null;
+      this.webSocket.onerror = null;
+    }
   }
 
   private decodeChunk(value: unknown): string {
@@ -166,10 +201,7 @@ export class WebSocketProcessor implements StreamProcessor {
   }
 }
 
-export class AsyncIterableProcessor implements StreamProcessor {
-  private chunkCallback?: (chunk: string) => void;
-  private endCallback?: () => void;
-  private errorCallback?: (error: Error) => void;
+export class AsyncIterableProcessor implements AsyncIterable<string> {
   private abortController = new AbortController();
   private decoder = new TextDecoder();
 
@@ -177,27 +209,11 @@ export class AsyncIterableProcessor implements StreamProcessor {
     private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
   ) {}
 
-  onChunk(callback: (chunk: string) => void): void {
-    this.chunkCallback = callback;
-  }
-
-  onEnd(callback: () => void): void {
-    this.endCallback = callback;
-  }
-
-  onError(callback: (error: Error) => void): void {
-    this.errorCallback = callback;
-  }
-
-  start(): void {
-    this.consume();
-  }
-
   stop(): void {
     this.abortController.abort();
   }
 
-  private async consume(): Promise<void> {
+  async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     try {
       for await (const chunk of this.asyncIterable) {
         if (this.abortController.signal.aborted) {
@@ -205,15 +221,11 @@ export class AsyncIterableProcessor implements StreamProcessor {
         }
 
         const decodedChunk = this.decodeChunk(chunk);
-        this.chunkCallback?.(decodedChunk);
-      }
-
-      if (!this.abortController.signal.aborted) {
-        this.endCallback?.();
+        yield decodedChunk;
       }
     } catch (error) {
       if (!this.abortController.signal.aborted) {
-        this.errorCallback?.(error as Error);
+        throw error;
       }
     }
   }
@@ -234,21 +246,25 @@ export class AsyncIterableProcessor implements StreamProcessor {
 
 // biome-ignore lint/complexity/noStaticOnlyClass: allow
 export class StreamProcessorFactory {
-  private static forReadableStream(stream: ReadableStream): StreamProcessor {
+  private static forReadableStream(
+    stream: ReadableStream,
+  ): AsyncIterable<string> {
     return new ReadableStreamProcessor(stream);
   }
 
-  private static forEventSource(eventSource: EventSource): StreamProcessor {
+  private static forEventSource(
+    eventSource: EventSource,
+  ): AsyncIterable<string> {
     return new EventSourceProcessor(eventSource);
   }
 
-  private static forWebSocket(webSocket: WebSocket): StreamProcessor {
+  private static forWebSocket(webSocket: WebSocket): AsyncIterable<string> {
     return new WebSocketProcessor(webSocket);
   }
 
   private static forAsyncIterable(
     asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): StreamProcessor {
+  ): AsyncIterable<string> {
     return new AsyncIterableProcessor(asyncIterable);
   }
 
@@ -258,7 +274,7 @@ export class StreamProcessorFactory {
       | EventSource
       | WebSocket
       | AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): StreamProcessor {
+  ): AsyncIterable<string> {
     if (typeof stream === "undefined" || stream === null) {
       throw new Error("Stream is undefined or null");
     }
