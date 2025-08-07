@@ -44,9 +44,8 @@ class StubEventSource implements EventSource {
     return true;
   }
 
-  addEventListener(): void {}
-
-  removeEventListener(): void {}
+  addEventListener() {}
+  removeEventListener() {}
 
   withCredentials: boolean = false;
 }
@@ -55,7 +54,7 @@ beforeEach(() => vi.resetAllMocks());
 
 it("should handle messages", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const stubEventSource = new StubEventSource(EventSource.OPEN);
   const adapter = new EventSourceProcessor(stubEventSource);
   const messages: Array<string> = [];
 
@@ -75,7 +74,7 @@ it("should handle messages", async () => {
 
 it("should end iteration when EventSource is closed", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(2); // EventSource.CLOSED
+  const stubEventSource = new StubEventSource(EventSource.CLOSED);
   const adapter = new EventSourceProcessor(stubEventSource);
   const messages: Array<string> = [];
 
@@ -92,7 +91,7 @@ it("should end iteration when EventSource is closed", async () => {
 
 it("should throw error when EventSource is connecting", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(0); // EventSource.CONNECTING
+  const stubEventSource = new StubEventSource(EventSource.CONNECTING);
   const adapter = new EventSourceProcessor(stubEventSource);
 
   // Act
@@ -109,7 +108,7 @@ it("should throw error when EventSource is connecting", async () => {
 
 it("should throw error when EventSource has error", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const stubEventSource = new StubEventSource(EventSource.OPEN);
   const adapter = new EventSourceProcessor(stubEventSource);
   const messages: Array<string> = [];
 
@@ -130,7 +129,7 @@ it("should throw error when EventSource has error", async () => {
 
 it("should close EventSource when stop() is called on EventSourceProcessor before iteration", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const stubEventSource = new StubEventSource(EventSource.OPEN);
   const adapter = new EventSourceProcessor(stubEventSource);
 
   // Act
@@ -146,7 +145,7 @@ it("should close EventSource when stop() is called on EventSourceProcessor befor
 
 it("should close EventSource when stop() is called on EventSourceProcessor during iteration", async () => {
   // Arrange
-  const stubEventSource = new StubEventSource(1); // EventSource.OPEN
+  const stubEventSource = new StubEventSource(EventSource.OPEN);
   const adapter = new EventSourceProcessor(stubEventSource);
   const messages: string[] = [];
 

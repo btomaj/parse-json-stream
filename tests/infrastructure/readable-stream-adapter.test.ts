@@ -53,9 +53,10 @@ it("should handle Uint8Array values", async () => {
   const adapter = new ReadableStreamProcessor(mockReadableStream);
   const chunks: Array<string> = [];
   const textEncoder = new TextEncoder();
+  const uint8Array = textEncoder.encode("hello");
 
   // Act
-  mockReadableStream.enqueue(textEncoder.encode("hello"));
+  mockReadableStream.enqueue(uint8Array);
   mockReadableStream.close();
   for await (const chunk of adapter) {
     chunks.push(chunk);
@@ -71,9 +72,10 @@ it("should handle ArrayBuffer values", async () => {
   const adapter = new ReadableStreamProcessor(mockReadableStream);
   const chunks: Array<string> = [];
   const textEncoder = new TextEncoder();
+  const buffer = textEncoder.encode("world").buffer;
 
   // Act
-  mockReadableStream.enqueue(textEncoder.encode("world").buffer);
+  mockReadableStream.enqueue(buffer);
   mockReadableStream.close();
   for await (const chunk of adapter) {
     chunks.push(chunk);
@@ -100,7 +102,7 @@ it("should handle stream errors", async () => {
   }).rejects.toThrow(errorMessage);
 });
 
-it.for([[123], [undefined], [null], [true], [false], [{ key: "value" }]])(
+it.for([[123], [undefined], [true], [false], [null], [{ key: "value" }]])(
   "should error on a %s value",
   async ([value]) => {
     // Arrange

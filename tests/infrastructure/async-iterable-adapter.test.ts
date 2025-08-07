@@ -23,8 +23,9 @@ it("should handle string values", async () => {
 it("should handle Uint8Array values", async () => {
   // Arrange
   async function* StubAsyncIterable() {
-    yield new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
-    yield new Uint8Array([32, 87, 111, 114, 108, 100]); // " World"
+    const encoder = new TextEncoder();
+    yield encoder.encode("Hello");
+    yield encoder.encode(" World");
   }
   const adapter = new AsyncIterableProcessor(StubAsyncIterable());
   const chunks: Array<string> = [];
@@ -41,15 +42,9 @@ it("should handle Uint8Array values", async () => {
 it("should handle ArrayBuffer values", async () => {
   // Arrange
   async function* StubAsyncIterable() {
-    const buffer1 = new ArrayBuffer(5);
-    const view1 = new Uint8Array(buffer1);
-    view1.set([72, 101, 108, 108, 111]); // "Hello"
-    yield buffer1;
-
-    const buffer2 = new ArrayBuffer(6);
-    const view2 = new Uint8Array(buffer2);
-    view2.set([32, 87, 111, 114, 108, 100]); // " World"
-    yield buffer2;
+    const encoder = new TextEncoder();
+    yield encoder.encode("Hello").buffer;
+    yield encoder.encode(" World").buffer;
   }
   const adapter = new AsyncIterableProcessor(StubAsyncIterable());
   const chunks: Array<string> = [];
@@ -85,7 +80,7 @@ it("should handle stop() during iteration", async () => {
   expect(chunks).toEqual(["1", "2"]);
 });
 
-it.for([[123], [undefined], [null], [true], [false], [{ key: "value" }]])(
+it.for([[123], [undefined], [true], [false], [null], [{ key: "value" }]])(
   "should error on a %s value",
   async ([value]) => {
     // Arrange
@@ -96,7 +91,7 @@ it.for([[123], [undefined], [null], [true], [false], [{ key: "value" }]])(
     const adapter = new AsyncIterableProcessor(StubAsyncIterable());
 
     // Act & Assert
-    expect(async () => {
+    await expect(async () => {
       await adapter[Symbol.asyncIterator]().next();
     }).rejects.toThrow("Unsupported chunk type for JSON stream");
   },
