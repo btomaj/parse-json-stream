@@ -32,7 +32,7 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
     }
   }
 
-  private decodeChunk(value: unknown): string {
+  private decodeChunk(value: string | ArrayBuffer): string {
     if (typeof value === "string") {
       return value;
     }
@@ -109,10 +109,26 @@ export class EventSourceProcessor implements AsyncIterable<string> {
 }
 
 export class WebSocketProcessor implements AsyncIterable<string> {
+  private webSocket: WebSocket;
   private decoder = new TextDecoder();
   private abortController = new AbortController();
+  private resolvePromise: (value: string | null) => void;
+  private rejectPromise: (error: Error) => void;
 
-  constructor(private webSocket: WebSocket) {}
+  constructor(webSocket: WebSocket) {
+    this.webSocket = webSocket;
+
+    this.resolvePromise = () => {
+      throw new Error(
+        "WebSocket event received before WebSocketProcessor iterator initialised resolvePromise method",
+      );
+    };
+    this.rejectPromise = () => {
+      throw new Error(
+        "WebSocket event received before WebSocketProcessor iterator initialised rejectPromise method",
+      );
+    };
+  }
 
   stop(): void {
     this.abortController.abort();
@@ -120,46 +136,36 @@ export class WebSocketProcessor implements AsyncIterable<string> {
   }
 
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
-    let resolveNext: ((value: string | null) => void) | null = null;
-    let rejectNext: ((error: Error) => void) | null = null;
-    let ended = false;
-
-    this.webSocket.onmessage = (event) => {
-      if (resolveNext) {
-        const chunk = this.decodeChunk(event.data);
-        resolveNext(chunk);
-        resolveNext = null;
-        rejectNext = null;
+    this.webSocket.onmessage = (event: MessageEvent) => {
+      try {
+        this.resolvePromise(this.decodeChunk(event.data));
+      } catch (error) {
+        this.rejectPromise(
+          error instanceof Error ? error : new Error(String(error)),
+        );
       }
     };
 
     this.webSocket.onclose = () => {
-      ended = true;
-      if (resolveNext) {
-        resolveNext(null); // Signal end
-        resolveNext = null;
-        rejectNext = null;
-      }
+      this.resolvePromise(null); // Signal end
     };
 
     this.webSocket.onerror = () => {
-      const error = new Error("WebSocket error");
-      if (rejectNext) {
-        rejectNext(error);
-        resolveNext = null;
-        rejectNext = null;
-      }
+      this.rejectPromise(new Error("WebSocket error"));
     };
 
     try {
-      while (!ended && !this.abortController.signal.aborted) {
+      while (
+        this.webSocket.readyState !== WebSocket.CLOSED &&
+        !this.abortController.signal.aborted
+      ) {
         const message = await new Promise<string | null>((resolve, reject) => {
           if (this.abortController.signal.aborted) {
             resolve(null);
             return;
           }
-          resolveNext = resolve;
-          rejectNext = reject;
+          this.resolvePromise = resolve;
+          this.rejectPromise = reject;
         });
 
         if (message === null || this.abortController.signal.aborted) {
@@ -174,7 +180,7 @@ export class WebSocketProcessor implements AsyncIterable<string> {
     }
   }
 
-  private decodeChunk(value: unknown): string {
+  private decodeChunk(value: string | ArrayBuffer): string {
     if (typeof value === "string") {
       return value;
     }
