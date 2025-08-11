@@ -63,7 +63,7 @@ const objectTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.Comma, // we find a comma
     JSONValue.Object, // inside an object,
-    JSONValue.Object, // so we're looking for a key, and
+    JSONValue.None, // so we're looking for a key, and
     [JSONValue.Object], // stay inside the object
   ),
   // Open object value: object
