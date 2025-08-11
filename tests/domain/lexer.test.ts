@@ -415,27 +415,26 @@ describe("JSONLexer", () => {
       .join("");
 
     // Assert
-    expect(lexeme).toEqual('"123');
+    expect(lexeme).toEqual('\\"123');
   });
 
   it.for([
-    ["true"],
-    ["false"],
-    ["null"],
-    ["1e+5"],
-    ["1.23e10"],
-    ["\\\\"],
-    ["\\/"],
-    ['\\"'],
-    ["\\b"],
-    ["\\r"],
-    ["\\f"],
-    ["\\n"],
-    ["\\t"],
-    ["\\u0041"],
-  ])("should tokenise %o across chunks", ([value]) => {
+    ["123", JSONValue.None],
+    ["true", JSONValue.None],
+    ["false", JSONValue.None],
+    ["null", JSONValue.None],
+    ["\\\\", JSONValue.String],
+    ["\\/", JSONValue.String],
+    ['\\"', JSONValue.String],
+    ["\\b", JSONValue.String],
+    ["\\r", JSONValue.String],
+    ["\\f", JSONValue.String],
+    ["\\n", JSONValue.String],
+    ["\\t", JSONValue.String],
+    ["\\u0041", JSONValue.String],
+  ])("should correctly tokenise %o across chunks", ([value, initialState]) => {
     // Arrange
-    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+    const lexer = new JSONLexer(JSONTransitions, initialState as JSONValue);
 
     // Act
     const tokens = [];

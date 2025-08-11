@@ -312,7 +312,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       position += 1;
     }
 
-    while (position < chunkLength) {
+    while (mark < chunkLength) {
       [position, symbol] = this.findFirstTransitionSymbol(chunk, position);
       // if there is no symbol remaining, emit the remaining non-whitespace content
       if (position < 0) {
@@ -337,7 +337,6 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
         // if the character is last in the chunk, escape the first character in the next chunk
         if (position + 1 === chunkLength) {
           this.isEscaped = true;
-          break;
         }
         position += 2;
         continue;
