@@ -1,5 +1,5 @@
 import { JSONSymbol, JSONValue } from "~/lib/domain/lexer";
-import { DPDATransition } from "./parser";
+import { DPDATransition } from "~/lib/domain/parser";
 
 export class JSONTransition extends DPDATransition<
   JSONValue,

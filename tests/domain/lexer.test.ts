@@ -417,4 +417,20 @@ describe("JSONLexer", () => {
     // Assert
     expect(lexeme).toEqual('"123');
   });
+  
+  it("should tokenise across chunks", () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+
+    // Act
+    const tokens = [];
+    tokens.push(...lexer.tokenise('"'));
+    tokens.push(...lexer.tokenise('"123"'));
+    const lexeme = tokens
+      .map((token) => token.buffer.slice(token.start, token.end))
+      .join("");
+
+    // Assert
+    expect(lexeme).toEqual('"123');
+  })
 });

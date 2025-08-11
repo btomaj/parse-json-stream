@@ -1,4 +1,4 @@
-import { parseStream } from "./index";
+import { parseStream } from "~/index";
 
 declare global {
   interface JSON {

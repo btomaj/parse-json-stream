@@ -1,8 +1,8 @@
+import type { JSONChunk } from "~/lib/domain/chunk";
 import { JSONLexer, JSONValue } from "~/lib/domain/lexer";
 import { JSONParser } from "~/lib/domain/parser";
+import { JSONTransitions } from "~/lib/domain/transitions";
 import { StreamProcessorFactory } from "~/lib/infrastructure/stream-adapter";
-import type { JSONChunk } from "./lib/domain/chunk";
-import { JSONTransitions } from "./lib/domain/transitions";
 
 export async function* parseStream(
   stream:

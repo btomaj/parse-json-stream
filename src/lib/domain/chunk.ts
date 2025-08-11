@@ -1,4 +1,4 @@
-import type { JSONValue } from "./lexer";
+import type { JSONValue } from "~/lib/domain/lexer";
 
 export class JSONChunk {
   private static readonly SPECIAL_CHARS_BITMAP = new Uint8Array([

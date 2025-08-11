@@ -5,7 +5,7 @@ import {
   JSONValue,
   type Lexer,
 } from "~/lib/domain/lexer";
-import type { JSONTransition } from "./transitions";
+import type { JSONTransition } from "~/lib/domain/transitions";
 
 export class DPDATransition<State, Input, Stack> extends FSMTransition<
   State,
