@@ -204,11 +204,9 @@ export class JSONParser extends DPDA<
         continue;
       }
 
-      yield new JSONChunk(
-        token.buffer.slice(token.start, token.end),
-        token.type,
-        [...this.path],
-      );
+      yield new JSONChunk(token.buffer, token.start, token.end, token.type, [
+        ...this.path,
+      ]);
     }
   }
 }

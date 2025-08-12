@@ -142,13 +142,15 @@ export class JSONChunk {
   ]);
 
   constructor(
-    private readonly _value: string,
+    private readonly _buffer: string,
+    private readonly _start: number,
+    private readonly _end: number,
     private readonly _type: JSONValue,
     private readonly _segments: ReadonlyArray<string | number>,
   ) {}
 
   get value(): string {
-    return this._value;
+    return this._buffer.slice(this._start, this._end);
   }
 
   get type(): JSONValue {
