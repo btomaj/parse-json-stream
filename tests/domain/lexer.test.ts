@@ -434,10 +434,12 @@ describe("JSONLexer", () => {
         }
         tokens.push(...lexer.tokenise("post"));
 
-        const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
-
         // Assert
+        const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
         expect(lexeme).toEqual(value);
+        expect(tokens[0].type).toBe(JSONValue.String);
+        expect(tokens[1].type).toBe(JSONValue.Escape);
+        expect(tokens[2].type).toBe(JSONValue.String);
       });
     },
   );

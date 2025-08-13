@@ -7,6 +7,7 @@ export enum JSONValue {
   True = "true",
   False = "false",
   Null = "null",
+  Escape = "escape",
 }
 
 /**
@@ -388,11 +389,10 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
       if (escapeCharacter) {
         yield {
-          type: this.state,
+          type: JSONValue.Escape,
           start: 0,
           end: escapeCharacter.length,
           buffer: escapeCharacter,
-          symbol: JSONSymbol.Escape,
         };
         mark = position += 1;
       } else {
@@ -446,11 +446,10 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
         if (escapeCharacter) {
           yield {
-            type: this.state,
+            type: JSONValue.Escape,
             start: 0,
             end: escapeCharacter.length,
             buffer: escapeCharacter,
-            symbol: JSONSymbol.Escape,
           };
           mark = position += 1;
           continue;
