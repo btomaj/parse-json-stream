@@ -281,9 +281,6 @@ describe("JSONLexer", () => {
     [" "],
     ["{}"],
     ["[]"],
-    ['\\"'],
-    ["\\\\"],
-    ["\\/"],
     ["1.2e-3"],
     ["-1.2E-3"],
     ["true"],
@@ -402,49 +399,70 @@ describe("JSONLexer", () => {
     expect(tokens).toEqual(["123"]);
   });
 
-  it("should escape across chunks", () => {
-    // Arrange
-    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+  it.for([["123"], ["true"], ["false"], ["null"]])(
+    "should correctly tokenise %o split across chunks",
+    ([value]) => {
+      // Arrange
+      const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
 
-    // Act
-    const tokens = [];
-    tokens.push(...lexer.tokenise('"\\'));
-    tokens.push(...lexer.tokenise('"123"'));
-    const lexeme = tokens
-      .map((token) => token.buffer.slice(token.start, token.end))
-      .join("");
+      // Act
+      const tokens = [];
+      tokens.push(...lexer.tokenise(value[0]));
+      tokens.push(...lexer.tokenise(value.slice(1)));
+      const lexeme = tokens
+        .map((token) => token.buffer.slice(token.start, token.end))
+        .join("");
 
-    // Assert
-    expect(lexeme).toEqual('\\"123');
-  });
+      // Assert
+      expect(lexeme).toEqual(value);
+    },
+  );
 
-  it.for([
-    ["123", JSONValue.None],
-    ["true", JSONValue.None],
-    ["false", JSONValue.None],
-    ["null", JSONValue.None],
-    ["\\\\", JSONValue.String],
-    ["\\/", JSONValue.String],
-    ['\\"', JSONValue.String],
-    ["\\b", JSONValue.String],
-    ["\\r", JSONValue.String],
-    ["\\f", JSONValue.String],
-    ["\\n", JSONValue.String],
-    ["\\t", JSONValue.String],
-    ["\\u0041", JSONValue.String],
-  ])("should correctly tokenise %o across chunks", ([value, initialState]) => {
-    // Arrange
-    const lexer = new JSONLexer(JSONTransitions, initialState as JSONValue);
+  describe.for([
+    ["\\\\"],
+    ["\\/"],
+    ['\\"'],
+    ["\\b"],
+    ["\\r"],
+    ["\\f"],
+    ["\\n"],
+    ["\\t"],
+    ["\\u0041"],
+  ])("should correctly tokenise %j split across chunks", ([value]) => {
+    const variants = [];
+    for (let chunkSize = 1; chunkSize < value.length; chunkSize++) {
+      // split into two chunks based on chunk size
+      variants.push([value.slice(0, chunkSize), value.slice(chunkSize)]);
+      if (chunkSize === 0) {
+        continue;
+      }
+      // split into n chunks based on chunk size
+      const numberOfChunks = Math.ceil(value.length / chunkSize);
+      if (numberOfChunks === 1 || numberOfChunks === 2) {
+        continue;
+      }
+      const chunks = [];
+      for (let i = 0; i < numberOfChunks; i += 1) {
+        chunks.push(value.slice(i * chunkSize, (i + 1) * chunkSize));
+      }
+      variants.push(chunks);
+    }
+    it.for(variants)("%$", (variant) => {
+      // Arrange
+      const lexer = new JSONLexer(JSONTransitions, JSONValue.String);
+      const tokens = [];
 
-    // Act
-    const tokens = [];
-    tokens.push(...lexer.tokenise(value[0]));
-    tokens.push(...lexer.tokenise(value.slice(1)));
-    const lexeme = tokens
-      .map((token) => token.buffer.slice(token.start, token.end))
-      .join("");
+      // Act
+      tokens.push(...lexer.tokenise("pre"));
+      for (let i = 0; i < variant.length; i++) {
+        tokens.push(...lexer.tokenise(variant[i]));
+      }
+      tokens.push(...lexer.tokenise("post"));
 
-    // Assert
-    expect(lexeme).toEqual(value);
+      const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
+
+      // Assert
+      expect(lexeme).toEqual(value);
+    });
   });
 });

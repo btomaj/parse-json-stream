@@ -1,5 +1,3 @@
-import invariant from "tiny-invariant";
-
 export enum JSONValue {
   None = "none",
   Object = "object",
@@ -119,12 +117,16 @@ export abstract class Lexer<
   Input extends Record<string, string | symbol>,
 > extends FSM<State, Input> {
   private readonly stateBitmasks: Record<State[keyof State], number>;
-  // bit mask for ASCII lexical rules
+  /**
+   * Bitmask for ASCII lexical rules.
+   */
   private readonly unicodeCharacterFlags:
     | Uint8Array
     | Uint16Array
     | Uint32Array;
-  // map of lexical rules to token types
+  /**
+   * Maps lexical rules to token types.
+   */
   private readonly unicodeCharacterMap: Array<Input[keyof Input]> = [];
 
   constructor(
@@ -193,7 +195,7 @@ export abstract class Lexer<
         );
       }
       const lexicalRule = transition.inputSymbol;
-      this.processLexicalRuleCharacters(lexicalRule, (character) => {
+      Lexer.processLexicalRuleCharacters(lexicalRule, (character) => {
         const unicode = character.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
@@ -207,10 +209,9 @@ export abstract class Lexer<
     return bitmaskArray;
   }
 
-  protected processLexicalRuleCharacters(
-    lexicalRule: Input[keyof Input],
-    processor: (character: string) => void,
-  ) {
+  protected static processLexicalRuleCharacters<
+    Input extends Record<string, string | number | symbol>,
+  >(lexicalRule: Input[keyof Input], processor: (character: string) => void) {
     let characters: string;
     if (typeof lexicalRule === "symbol") {
       if (typeof lexicalRule.description === "undefined") {
@@ -260,20 +261,9 @@ export abstract class Lexer<
 }
 
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
-  private isEscaped = false;
-
   private static readonly symbolLexemes = new Uint8Array(128);
 
-  constructor(
-    transitions: Array<
-      FSMTransition<
-        (typeof JSONValue)[keyof typeof JSONValue],
-        (typeof JSONSymbol)[keyof typeof JSONSymbol]
-      >
-    >,
-    initialState: (typeof JSONValue)[keyof typeof JSONValue],
-  ) {
-    super(transitions, initialState);
+  static {
     for (const lexicalRule of [
       JSONSymbol.LBrace,
       JSONSymbol.RBrace,
@@ -282,7 +272,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       JSONSymbol.Colon,
       JSONSymbol.Comma,
     ]) {
-      this.processLexicalRuleCharacters(lexicalRule, (character) => {
+      Lexer.processLexicalRuleCharacters(lexicalRule, (character) => {
         const unicode = character.charCodeAt(0);
         if (unicode > 127) {
           throw new Error("Non-ASCII character");
@@ -290,6 +280,65 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
         JSONLexer.symbolLexemes[unicode] = 1;
       });
     }
+  }
+
+  /**
+   * Buffers escape characters across chunks.
+   *
+   * Used by {@link processEscapeCharacter}.
+   */
+  private escapeBuffer = new Uint8Array(6);
+
+  /**
+   * Tracks escape character buffer across chunks.
+   *
+   * Used by {@link processEscapeCharacter}.
+   */
+  private escapeBufferLength = 0;
+
+  private processEscapeCharacter(
+    chunk: string,
+    position: number,
+  ): [number, string | null] {
+    const chunkLength = chunk.length;
+    const buffer = this.escapeBuffer;
+    const bufferLength = this.escapeBufferLength;
+    const U = 117; // "u".charCodeAt(0) === 117
+
+    let needed: number;
+    if (bufferLength > 1 && buffer[1] === U) {
+      needed = 6 - bufferLength;
+    } else if (bufferLength === 1 && chunk.charCodeAt(position) === U) {
+      needed = 6 - bufferLength;
+    } else if (bufferLength === 0 && chunk.charCodeAt(position + 1) === U) {
+      needed = 6 - bufferLength;
+    } else {
+      needed = 2 - bufferLength;
+    }
+    const available = Math.min(chunkLength - position, needed);
+
+    for (let i = 0; i < available; i += 1) {
+      buffer[bufferLength + i] = chunk.charCodeAt(position + i);
+    }
+    position += available;
+
+    if (available === needed) {
+      this.escapeBufferLength = 0;
+      return [
+        position,
+        // .apply() is faster than ...spread
+        String.fromCharCode.apply(
+          null,
+          buffer.subarray(
+            0,
+            bufferLength + available,
+          ) as unknown as Array<number>,
+        ),
+      ];
+    }
+
+    this.escapeBufferLength += available;
+    return [position, null];
   }
 
   public *tokenise(
@@ -305,17 +354,32 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
      */
     let position = 0;
     let symbol: JSONSymbol | null;
+    let escapeCharacter: string | null;
 
-    // if the last character in the previous chunk was an escape character, escape the first character
-    if (this.isEscaped) {
-      this.isEscaped = false;
-      position += 1;
+    if (this.escapeBufferLength > 0) {
+      [position, escapeCharacter] = this.processEscapeCharacter(
+        chunk,
+        position,
+      );
+
+      if (escapeCharacter) {
+        yield {
+          type: this.state,
+          start: 0,
+          end: escapeCharacter.length,
+          buffer: escapeCharacter,
+          symbol: JSONSymbol.Escape,
+        };
+        mark = position += 1;
+      } else {
+        return;
+      }
     }
 
     while (mark < chunkLength) {
       [position, symbol] = this.findFirstTransitionSymbol(chunk, position);
       // if there is no symbol remaining, emit the remaining non-whitespace content
-      if (position < 0) {
+      if (symbol === null) {
         // don't yield whitespace
         if (this.state === JSONValue.None) {
           return;
@@ -330,17 +394,6 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
         return;
       }
       // else there is a symbol in the chunk
-      invariant(symbol);
-
-      // skip past the escaped character
-      if (symbol === JSONSymbol.Escape) {
-        // if the character is last in the chunk, escape the first character in the next chunk
-        if (position + 1 === chunkLength) {
-          this.isEscaped = true;
-        }
-        position += 2;
-        continue;
-      }
 
       // if the symbol is not the first character, emit everything up to (not including) the symbol
       // biome-ignore lint/suspicious/noConfusingLabels: early return
@@ -361,9 +414,29 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
         mark = position; // start past lexeme
       }
 
-      this.transition(symbol);
+      if (symbol === JSONSymbol.Escape) {
+        [position, escapeCharacter] = this.processEscapeCharacter(
+          chunk,
+          position,
+        );
 
+        if (escapeCharacter) {
+          yield {
+            type: this.state,
+            start: 0,
+            end: escapeCharacter.length,
+            buffer: escapeCharacter,
+            symbol: JSONSymbol.Escape,
+          };
+          mark = position += 1;
+          continue;
+        }
+        return;
+      }
+
+      this.transition(symbol);
       position += 1; // advance position past symbol
+
       if (JSONLexer.symbolLexemes[chunk.charCodeAt(position - 1)]) {
         yield {
           type: this.state,
@@ -383,7 +456,5 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
       // if the symbol is not the last character in the chunk, loop, and continue processing the rest of the chunk
     }
-
-    // XXX return any remaining buffered value
   }
 }
