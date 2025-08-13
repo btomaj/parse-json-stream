@@ -140,6 +140,7 @@ export abstract class Lexer<
       transitions,
       this.stateBitmasks,
     );
+    this.unicodeCharacterMap = this.createUnicodeCharacterMap(transitions);
   }
 
   private createStateBitmasks(
@@ -202,11 +203,34 @@ export abstract class Lexer<
         }
         bitmaskArray[unicode] |=
           bitmasks[transition.currentState] ?? 0xffffffff;
-        this.unicodeCharacterMap[unicode] = transition.inputSymbol;
       });
     }
 
     return bitmaskArray;
+  }
+
+  private createUnicodeCharacterMap(
+    transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
+  ): Array<Input[keyof Input]> {
+    const characterMap: Array<Input[keyof Input]> = [];
+
+    for (const transition of transitions) {
+      if (!transition.inputSymbol) {
+        throw new Error(
+          `inputSymbol cannot be falsy for transition: ${transition}`,
+        );
+      }
+      const lexicalRule = transition.inputSymbol;
+      Lexer.processLexicalRuleCharacters(lexicalRule, (character) => {
+        const unicode = character.charCodeAt(0);
+        if (unicode > 127) {
+          throw new Error("Non-ASCII character");
+        }
+        characterMap[unicode] = transition.inputSymbol;
+      });
+    }
+
+    return characterMap;
   }
 
   protected static processLexicalRuleCharacters<
