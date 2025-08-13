@@ -372,33 +372,6 @@ describe("JSONLexer", () => {
     },
   );
 
-  it("should ignore whitespace surrounding lexemes", () => {
-    // Arrange
-    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
-
-    // Act
-    const tokens = Array.from(
-      lexer.tokenise(' "string" 1 \t\n\r true false null '),
-    ).map((token) => token.buffer.slice(token.start, token.end));
-
-    // Assert
-    expect(tokens).toEqual(["string", "1", "true", "false", "null"]);
-  });
-
-  it.skip("should should buffer incomplete non-string primitives", () => {
-    // Arrange
-    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
-
-    // Act
-    lexer.tokenise("1");
-    const tokens = Array.from(lexer.tokenise("23")).map((token) =>
-      token.buffer.slice(token.start, token.end),
-    );
-
-    // Assert
-    expect(tokens).toEqual(["123"]);
-  });
-
   it.for([["123"], ["true"], ["false"], ["null"]])(
     "should correctly tokenise %o split across chunks",
     ([value]) => {
@@ -428,41 +401,71 @@ describe("JSONLexer", () => {
     ["\\n"],
     ["\\t"],
     ["\\u0041"],
-  ])("should correctly tokenise %j split across chunks", ([value]) => {
-    const variants = [];
-    for (let chunkSize = 1; chunkSize < value.length; chunkSize++) {
-      // split into two chunks based on chunk size
-      variants.push([value.slice(0, chunkSize), value.slice(chunkSize)]);
-      if (chunkSize === 0) {
-        continue;
+  ])(
+    "should correctly tokenise string containing %j split across chunks",
+    ([value]) => {
+      const variants = [];
+      for (let chunkSize = 1; chunkSize < value.length; chunkSize++) {
+        // split into two chunks based on chunk size
+        variants.push([value.slice(0, chunkSize), value.slice(chunkSize)]);
+        if (chunkSize === 0) {
+          continue;
+        }
+        // split into n chunks based on chunk size
+        const numberOfChunks = Math.ceil(value.length / chunkSize);
+        if (numberOfChunks === 1 || numberOfChunks === 2) {
+          continue;
+        }
+        const chunks = [];
+        for (let i = 0; i < numberOfChunks; i += 1) {
+          chunks.push(value.slice(i * chunkSize, (i + 1) * chunkSize));
+        }
+        variants.push(chunks);
       }
-      // split into n chunks based on chunk size
-      const numberOfChunks = Math.ceil(value.length / chunkSize);
-      if (numberOfChunks === 1 || numberOfChunks === 2) {
-        continue;
-      }
-      const chunks = [];
-      for (let i = 0; i < numberOfChunks; i += 1) {
-        chunks.push(value.slice(i * chunkSize, (i + 1) * chunkSize));
-      }
-      variants.push(chunks);
-    }
-    it.for(variants)("%$", (variant) => {
-      // Arrange
-      const lexer = new JSONLexer(JSONTransitions, JSONValue.String);
-      const tokens = [];
+      it.for(variants)("%$", (variant) => {
+        // Arrange
+        const lexer = new JSONLexer(JSONTransitions, JSONValue.String);
+        const tokens = [];
 
-      // Act
-      tokens.push(...lexer.tokenise("pre"));
-      for (let i = 0; i < variant.length; i++) {
-        tokens.push(...lexer.tokenise(variant[i]));
-      }
-      tokens.push(...lexer.tokenise("post"));
+        // Act
+        tokens.push(...lexer.tokenise("pre"));
+        for (let i = 0; i < variant.length; i++) {
+          tokens.push(...lexer.tokenise(variant[i]));
+        }
+        tokens.push(...lexer.tokenise("post"));
 
-      const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
+        const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
 
-      // Assert
-      expect(lexeme).toEqual(value);
-    });
+        // Assert
+        expect(lexeme).toEqual(value);
+      });
+    },
+  );
+
+  it("should ignore whitespace surrounding lexemes", () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+
+    // Act
+    const tokens = Array.from(
+      lexer.tokenise(' "string" 1 \t\n\r true false null '),
+    ).map((token) => token.buffer.slice(token.start, token.end));
+
+    // Assert
+    expect(tokens).toEqual(["string", "1", "true", "false", "null"]);
+  });
+
+  it.skip("should should buffer incomplete non-string primitives", () => {
+    // Arrange
+    const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
+
+    // Act
+    lexer.tokenise("1");
+    const tokens = Array.from(lexer.tokenise("23")).map((token) =>
+      token.buffer.slice(token.start, token.end),
+    );
+
+    // Assert
+    expect(tokens).toEqual(["123"]);
   });
 });
