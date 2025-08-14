@@ -312,7 +312,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
    *
    * Used by {@link processEscapeCharacter}.
    */
-  private escapeBuffer = new Uint8Array(6);
+  private readonly escapeBuffer = new Uint8Array(6);
 
   /**
    * Tracks escape character buffer across chunks.
@@ -320,6 +320,19 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
    * Used by {@link processEscapeCharacter}.
    */
   private escapeBufferLength = 0;
+
+  private static readonly escapeTable: Array<string> = new Array(128);
+
+  static {
+    JSONLexer.escapeTable[92] = "\\"; // backslash
+    JSONLexer.escapeTable[47] = "/"; // forward slash
+    JSONLexer.escapeTable[34] = '"'; // double quote
+    JSONLexer.escapeTable[98] = "\b"; // backspace
+    JSONLexer.escapeTable[102] = "\f"; // form feed
+    JSONLexer.escapeTable[110] = "\n"; // newline
+    JSONLexer.escapeTable[114] = "\r"; // carriage return
+    JSONLexer.escapeTable[116] = "\t"; // tab
+  }
 
   private processEscapeCharacter(
     chunk: string,
@@ -337,7 +350,10 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       needed = 6 - bufferLength;
     } else if (bufferLength === 0 && chunk.charCodeAt(position + 1) === U) {
       needed = 6 - bufferLength;
+      // NOTE this doesn't cause a bug when position + 1 is undefined because ...
     } else {
+      // if: bufferLength is 0, and position + 1 is undefined,
+      // then: there is only 1 character left in the chunk, and needed > available
       needed = 2 - bufferLength;
     }
     const available = Math.min(chunkLength - position, needed);
