@@ -392,37 +392,51 @@ describe("JSONLexer", () => {
   );
 
   describe.for([
-    ["\\\\"],
-    ["\\/"],
-    ['\\"'],
-    ["\\b"],
-    ["\\r"],
-    ["\\f"],
-    ["\\n"],
-    ["\\t"],
-    ["\\u0041"],
+    ["\\\\", "\\"],
+    ["\\/", "\/"],
+    ['\\"', '"'],
+    ["\\b", "\b"],
+    ["\\r", "\r"],
+    ["\\f", "\f"],
+    ["\\n", "\n"],
+    ["\\t", "\t"],
+    ["\\u0041", "A"],
   ])(
     "should correctly tokenise string containing %j split across chunks",
-    ([value]) => {
+    ([jsonEscapeCharacter, expected]) => {
       const variants = [];
-      for (let chunkSize = 1; chunkSize < value.length; chunkSize++) {
+      for (
+        let chunkSize = 1;
+        chunkSize < jsonEscapeCharacter.length;
+        chunkSize++
+      ) {
         // split into two chunks based on chunk size
-        variants.push([value.slice(0, chunkSize), value.slice(chunkSize)]);
+        variants.push([
+          [
+            jsonEscapeCharacter.slice(0, chunkSize),
+            jsonEscapeCharacter.slice(chunkSize),
+          ],
+          expected,
+        ]);
         if (chunkSize === 0) {
           continue;
         }
         // split into n chunks based on chunk size
-        const numberOfChunks = Math.ceil(value.length / chunkSize);
+        const numberOfChunks = Math.ceil(
+          jsonEscapeCharacter.length / chunkSize,
+        );
         if (numberOfChunks === 1 || numberOfChunks === 2) {
           continue;
         }
         const chunks = [];
         for (let i = 0; i < numberOfChunks; i += 1) {
-          chunks.push(value.slice(i * chunkSize, (i + 1) * chunkSize));
+          chunks.push(
+            jsonEscapeCharacter.slice(i * chunkSize, (i + 1) * chunkSize),
+          );
         }
-        variants.push(chunks);
+        variants.push([chunks, expected]);
       }
-      it.for(variants)("%$", (variant) => {
+      it.for(variants)("%$", ([variant, expected]) => {
         // Arrange
         const lexer = new JSONLexer(JSONTransitions, JSONValue.String);
         const tokens = [];
@@ -435,11 +449,10 @@ describe("JSONLexer", () => {
         tokens.push(...lexer.tokenise("post"));
 
         // Assert
+        console.log(tokens);
         const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
-        expect(lexeme).toEqual(value);
-        expect(tokens[0].type).toBe(JSONValue.String);
-        expect(tokens[1].type).toBe(JSONValue.Escape);
-        expect(tokens[2].type).toBe(JSONValue.String);
+        expect(lexeme).toEqual(expected);
+        expect(tokens.length).toBe(3);
       });
     },
   );

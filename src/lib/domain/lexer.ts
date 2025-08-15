@@ -7,7 +7,6 @@ export enum JSONValue {
   True = "true",
   False = "false",
   Null = "null",
-  Escape = "escape",
 }
 
 /**
@@ -321,65 +320,86 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
    */
   private escapeBufferLength = 0;
 
-  private static readonly escapeTable: Array<string> = new Array(128);
+  private static readonly escapeSequenceTable: Array<string> = new Array(128);
 
   static {
-    JSONLexer.escapeTable[92] = "\\"; // backslash
-    JSONLexer.escapeTable[47] = "/"; // forward slash
-    JSONLexer.escapeTable[34] = '"'; // double quote
-    JSONLexer.escapeTable[98] = "\b"; // backspace
-    JSONLexer.escapeTable[102] = "\f"; // form feed
-    JSONLexer.escapeTable[110] = "\n"; // newline
-    JSONLexer.escapeTable[114] = "\r"; // carriage return
-    JSONLexer.escapeTable[116] = "\t"; // tab
+    JSONLexer.escapeSequenceTable[34] = '"'; // "
+    JSONLexer.escapeSequenceTable[92] = "\\"; // \
+    JSONLexer.escapeSequenceTable[47] = "/"; // /
+    JSONLexer.escapeSequenceTable[98] = "\b"; // backspace
+    JSONLexer.escapeSequenceTable[102] = "\f"; // form feed
+    JSONLexer.escapeSequenceTable[110] = "\n"; // newline
+    JSONLexer.escapeSequenceTable[114] = "\r"; // carriage return
+    JSONLexer.escapeSequenceTable[116] = "\t"; // tab
   }
 
+  /**
+   *
+   * @param chunk
+   * @param position The 0-based character index of the escape character in the chunk.
+   * @returns
+   */
   private processEscapeCharacter(
     chunk: string,
     position: number,
   ): [number, string | null] {
-    const chunkLength = chunk.length;
     const buffer = this.escapeBuffer;
     const bufferLength = this.escapeBufferLength;
-    const U = 117; // "u".charCodeAt(0) === 117
+    const chunkLength = chunk.length;
 
-    let needed: number;
-    if (bufferLength > 1 && buffer[1] === U) {
-      needed = 6 - bufferLength;
-    } else if (bufferLength === 1 && chunk.charCodeAt(position) === U) {
-      needed = 6 - bufferLength;
-    } else if (bufferLength === 0 && chunk.charCodeAt(position + 1) === U) {
-      needed = 6 - bufferLength;
-      // NOTE this doesn't cause a bug when position + 1 is undefined because ...
-    } else {
-      // if: bufferLength is 0, and position + 1 is undefined,
-      // then: there is only 1 character left in the chunk, and needed > available
-      needed = 2 - bufferLength;
+    let needed = 2 - bufferLength;
+    if (
+      (bufferLength >= 2 && buffer[1] === 117) || // 'u'
+      (bufferLength < 2 &&
+        chunk.charCodeAt(position + 1 - bufferLength) === 117)
+      // BUG bufferLength === 1 && chunk[position + 1] === undefined
+    ) {
+      needed = 6 - bufferLength; // Unicode escape
     }
-    const available = Math.min(chunkLength - position, needed);
 
+    const available = Math.min(needed, chunkLength - position);
     for (let i = 0; i < available; i += 1) {
       buffer[bufferLength + i] = chunk.charCodeAt(position + i);
     }
     position += available;
 
-    if (available === needed) {
-      this.escapeBufferLength = 0;
-      return [
-        position,
-        // .apply() is faster than ...spread
-        String.fromCharCode.apply(
-          null,
-          buffer.subarray(
-            0,
-            bufferLength + available,
-          ) as unknown as Array<number>,
-        ),
-      ];
+    if (available < needed) {
+      this.escapeBufferLength += available;
+      return [position, null];
     }
 
-    this.escapeBufferLength += available;
-    return [position, null];
+    let result: string | null = null;
+
+    if (buffer[1] !== 117) {
+      // result === null on invalid escape code; continues lexing
+      result = JSONLexer.escapeSequenceTable[buffer[1]] ?? null;
+    } else {
+      // unicode escape sequence \uXXXX
+      let codePoint = 0;
+      for (let i = 2; i < 6; i++) {
+        const unicodeCharacterCode = buffer[i];
+        let hexDigit: number;
+        console.log(unicodeCharacterCode, buffer);
+        if (unicodeCharacterCode >= 48 && unicodeCharacterCode <= 57) {
+          hexDigit = unicodeCharacterCode - 48; // 0-9
+        } else if (unicodeCharacterCode >= 65 && unicodeCharacterCode <= 70) {
+          hexDigit = unicodeCharacterCode - 65 + 10; // A-F
+        } else if (unicodeCharacterCode >= 97 && unicodeCharacterCode <= 102) {
+          hexDigit = unicodeCharacterCode - 97 + 10; // a-f
+        } else {
+          // result === null on invalid escape sequence; continues lexing
+          codePoint = -1;
+          break;
+        }
+        codePoint = (codePoint << 4) | hexDigit;
+      }
+      if (codePoint >= 0 && codePoint <= 0x10ffff) {
+        result = String.fromCodePoint(codePoint);
+      } // else: result === null from above
+    }
+
+    this.escapeBufferLength = 0;
+    return [position, result];
   }
 
   public *tokenise(
@@ -405,7 +425,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
       if (escapeCharacter) {
         yield {
-          type: JSONValue.Escape,
+          type: JSONValue.String,
           start: 0,
           end: escapeCharacter.length,
           buffer: escapeCharacter,
@@ -462,7 +482,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
         if (escapeCharacter) {
           yield {
-            type: JSONValue.Escape,
+            type: JSONValue.String,
             start: 0,
             end: escapeCharacter.length,
             buffer: escapeCharacter,
