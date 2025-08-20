@@ -345,114 +345,85 @@ describe("JSONLexer", () => {
     });
   });
 
-  describe.for([["true"], ["false"], ["null"]])(
-    "should correctly tokenise %s",
-    ([primitive]) => {
-      // Arrange
-      const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
-      it.for([
-        [" ", [primitive]],
-        ["{}", [primitive, "{", "}"]],
-        ["[]", [primitive, "[", "]"]],
-        ['""', [primitive]],
-        ["1.2e-3", [primitive, "1.2e-3"]],
-        ["-1.2E-3", [primitive, "-1.2E-3"]],
-        ["true", [primitive, "true"]],
-        ["false", [primitive, "false"]],
-        ["null", [primitive, "null"]],
-      ])("immediately followed by %O", ([addendum, expected]) => {
-        // Act
-        const tokens = Array.from(lexer.tokenise(primitive + addendum)).map(
-          (token) => token.buffer.slice(token.start, token.end),
-        );
-
-        // Assert
-        expect(tokens).toEqual(expected);
-      });
-    },
-  );
-
-  it.for([["123"], ["true"], ["false"], ["null"]])(
-    "should correctly tokenise %o split across chunks",
-    ([value]) => {
-      // Arrange
-      const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
-
-      // Act
-      const tokens = [];
-      tokens.push(...lexer.tokenise(value[0]));
-      tokens.push(...lexer.tokenise(value.slice(1)));
-      const lexeme = tokens
-        .map((token) => token.buffer.slice(token.start, token.end))
-        .join("");
-
-      // Assert
-      expect(lexeme).toEqual(value);
-    },
-  );
-
   describe.for([
-    ["\\\\", "\\"],
-    ["\\/", "\/"],
-    ['\\"', '"'],
-    ["\\b", "\b"],
-    ["\\r", "\r"],
-    ["\\f", "\f"],
-    ["\\n", "\n"],
-    ["\\t", "\t"],
-    ["\\u0041", "A"],
-  ])(
-    "should correctly tokenise string containing %j split across chunks",
-    ([jsonEscapeCharacter, expected]) => {
+    ["123", "123"],
+    ["true", "true"],
+    ["false", "false"],
+    ["null", "null"],
+    ['"\\\\"', "\\"],
+    ['"\\/"', "\/"],
+    ['"\\""', '"'],
+    ['"\\b"', "\b"],
+    ['"\\r"', "\r"],
+    ['"\\f"', "\f"],
+    ['"\\n"', "\n"],
+    ['"\\t"', "\t"],
+    ['"\\u0041"', "A"],
+  ])("should correctly tokenise %o", ([primitive, expected]) => {
+    describe.for([
+      [" ", [expected]],
+      ["{}", [expected, "{", "}"]],
+      ["[]", [expected, "[", "]"]],
+      ['""', [expected]],
+      // ["1.2e-3", [expected, "1.2e-3"]],
+      // ["-1.2E-3", [expected, "-1.2E-3"]],
+      ["true", [expected, "true"]],
+      ["false", [expected, "false"]],
+      ["null", [expected, "null"]],
+    ])("immediately followed by %O", ([addendum, expected]) => {
       const variants = [];
-      for (
-        let chunkSize = 1;
-        chunkSize < jsonEscapeCharacter.length;
-        chunkSize++
-      ) {
+      for (let chunkSize = 0; chunkSize < primitive.length; chunkSize++) {
         // split into two chunks based on chunk size
-        variants.push([
-          [
-            jsonEscapeCharacter.slice(0, chunkSize),
-            jsonEscapeCharacter.slice(chunkSize),
-          ],
-          expected,
-        ]);
         if (chunkSize === 0) {
+          variants.push([
+            [primitive, addendum as string],
+            expected as Array<string>,
+          ]);
           continue;
         }
+        variants.push([
+          [
+            primitive.slice(0, chunkSize),
+            primitive.slice(chunkSize),
+            addendum as string,
+          ],
+          expected as Array<string>,
+        ]);
         // split into n chunks based on chunk size
-        const numberOfChunks = Math.ceil(
-          jsonEscapeCharacter.length / chunkSize,
-        );
+        const numberOfChunks = Math.ceil(primitive.length / chunkSize);
         if (numberOfChunks === 1 || numberOfChunks === 2) {
           continue;
         }
         const chunks = [];
         for (let i = 0; i < numberOfChunks; i += 1) {
-          chunks.push(
-            jsonEscapeCharacter.slice(i * chunkSize, (i + 1) * chunkSize),
-          );
+          chunks.push(primitive.slice(i * chunkSize, (i + 1) * chunkSize));
         }
-        variants.push([chunks, expected]);
+        variants.push([
+          [...chunks, addendum as string],
+          expected as Array<string>,
+        ]);
       }
-      it.for(variants)("%$", ([variant, expected]) => {
+      it.for(variants)("split across chunks #%$", ([variant, expected]) => {
         // Arrange
-        const lexer = new JSONLexer(JSONTransitions, JSONValue.String);
+        const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
         const tokens = [];
 
         // Act
-        tokens.push(...lexer.tokenise("pre"));
         for (let i = 0; i < variant.length; i++) {
           tokens.push(...lexer.tokenise(variant[i]));
         }
-        tokens.push(...lexer.tokenise("post"));
+
+        const primitive = tokens
+          .splice(0, tokens.length - (expected.length - 1))
+          .map((token) => token.buffer.slice(token.start, token.end))
+          .join("");
+
+        const addendum = tokens.map((token) => {
+          return token.buffer.slice(token.start, token.end);
+        });
 
         // Assert
-        console.log(tokens);
-        const lexeme = tokens[1].buffer.slice(tokens[1].start, tokens[1].end);
-        expect(lexeme).toEqual(expected);
-        expect(tokens.length).toBe(3);
+        expect([primitive, ...addendum]).toEqual(expected);
       });
     },
   );

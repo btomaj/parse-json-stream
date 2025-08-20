@@ -337,7 +337,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
    *
    * @param chunk
    * @param position The 0-based character index of the escape character in the chunk.
-   * @returns
+   * @returns {[position: number, escapeSequence: string | null]} The first tuple element is the 0-based character index of the last character in the escape sequence. The second tuple element is the escape sequence, if complete, or null.
    */
   private processEscapeCharacter(
     chunk: string,
@@ -346,13 +346,12 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
     const buffer = this.escapeBuffer;
     const bufferLength = this.escapeBufferLength;
     const chunkLength = chunk.length;
+    const U = 117; // "u".charCodeAt(0);
 
     let needed = 2 - bufferLength;
     if (
-      (bufferLength >= 2 && buffer[1] === 117) || // 'u'
-      (bufferLength < 2 &&
-        chunk.charCodeAt(position + 1 - bufferLength) === 117)
-      // BUG bufferLength === 1 && chunk[position + 1] === undefined
+      (bufferLength >= 2 && buffer[1] === U) ||
+      (bufferLength < 2 && chunk.charCodeAt(position + 1 - bufferLength) === U)
     ) {
       needed = 6 - bufferLength; // Unicode escape
     }
@@ -370,7 +369,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
 
     let result: string | null = null;
 
-    if (buffer[1] !== 117) {
+    if (buffer[1] !== U) {
       // result === null on invalid escape code; continues lexing
       result = JSONLexer.escapeSequenceTable[buffer[1]] ?? null;
     } else {
@@ -379,7 +378,6 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       for (let i = 2; i < 6; i++) {
         const unicodeCharacterCode = buffer[i];
         let hexDigit: number;
-        console.log(unicodeCharacterCode, buffer);
         if (unicodeCharacterCode >= 48 && unicodeCharacterCode <= 57) {
           hexDigit = unicodeCharacterCode - 48; // 0-9
         } else if (unicodeCharacterCode >= 65 && unicodeCharacterCode <= 70) {
@@ -395,7 +393,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       }
       if (codePoint >= 0 && codePoint <= 0x10ffff) {
         result = String.fromCodePoint(codePoint);
-      } // else: result === null from above
+      }
     }
 
     this.escapeBufferLength = 0;
@@ -415,22 +413,19 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
      */
     let position = 0;
     let symbol: JSONSymbol | null;
-    let escapeCharacter: string | null;
+    let escapeSequence: string | null;
 
     if (this.escapeBufferLength > 0) {
-      [position, escapeCharacter] = this.processEscapeCharacter(
-        chunk,
-        position,
-      );
+      [position, escapeSequence] = this.processEscapeCharacter(chunk, position);
 
-      if (escapeCharacter) {
+      if (escapeSequence) {
         yield {
           type: JSONValue.String,
           start: 0,
-          end: escapeCharacter.length,
-          buffer: escapeCharacter,
+          end: escapeSequence.length,
+          buffer: escapeSequence,
         };
-        mark = position += 1;
+        mark = position;
       } else {
         return;
       }
@@ -475,19 +470,19 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
       }
 
       if (symbol === JSONSymbol.Escape) {
-        [position, escapeCharacter] = this.processEscapeCharacter(
+        [position, escapeSequence] = this.processEscapeCharacter(
           chunk,
           position,
         );
 
-        if (escapeCharacter) {
+        if (escapeSequence) {
           yield {
             type: JSONValue.String,
             start: 0,
-            end: escapeCharacter.length,
-            buffer: escapeCharacter,
+            end: escapeSequence.length,
+            buffer: escapeSequence,
           };
-          mark = position += 1;
+          mark = position;
           continue;
         }
         return;
