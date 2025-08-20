@@ -161,6 +161,7 @@ export class JSONParser extends DPDA<
       if (token.symbol) {
         this.transition(token.symbol);
 
+        // TODO this is smelly. "+ 1" because we assume starting stack value is JSONValue.None
         if (this.stack.length > this.path.length + 1) {
           if (this.stack[this.stack.length - 1] === JSONValue.Array) {
             this.path.push(0);
@@ -186,6 +187,7 @@ export class JSONParser extends DPDA<
           token.symbol === JSONSymbol.Comma &&
           this.stack[this.stack.length - 1] === JSONValue.Object
         ) {
+          this.path.pop();
           this.keyBuffer = "";
           this.isBufferingKey = true;
         } else if (
