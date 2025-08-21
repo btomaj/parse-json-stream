@@ -313,115 +313,141 @@ describe("JSONParser", () => {
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.LBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 0,
       end: 1,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 2,
       end: 8,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.Colon,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 9,
       end: 10,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.LBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 10,
       end: 11,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 12,
       end: 15,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.Colon,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 16,
       end: 17,
     });
     lexer.setReturnToken({
       type: JSONValue.Number,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 17,
       end: 18,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.RBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 18,
       end: 19,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.Comma,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 19,
       end: 20,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 21,
       end: 27,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.Colon,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 28,
       end: 29,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.LBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 29,
       end: 30,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 31,
       end: 36,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.Colon,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 37,
       end: 38,
     });
     lexer.setReturnToken({
       type: JSONValue.String,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 39,
       end: 44,
     });
     lexer.setReturnToken({
       type: JSONValue.Object,
-      symbol: JSONSymbol.RBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
+      symbol: JSONSymbol.Comma,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
       start: 45,
       end: 46,
     });
     lexer.setReturnToken({
+      type: JSONValue.String,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      start: 47,
+      end: 50,
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONSymbol.Colon,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      start: 51,
+      end: 52,
+    });
+    lexer.setReturnToken({
+      type: JSONValue.String,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      start: 53,
+      end: 56,
+    });
+    lexer.setReturnToken({
       type: JSONValue.Object,
       symbol: JSONSymbol.RBrace,
-      buffer: '{"number":{"one":1},"string":{"hello":"world"}}',
-      start: 46,
-      end: 47,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      start: 57,
+      end: 58,
+    });
+    lexer.setReturnToken({
+      type: JSONValue.Object,
+      symbol: JSONSymbol.RBrace,
+      buffer: '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      start: 58,
+      end: 59,
     });
     const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
       JSONValue.None,
@@ -429,11 +455,15 @@ describe("JSONParser", () => {
 
     // Act
     const chunks = Array.from(
-      parser.parse('{"number":{"one":1},"string":{"hello":"world"}}'),
+      parser.parse(
+        '{"number":{"one":1},"string":{"hello":"world","foo":"bar"}}',
+      ),
     );
 
+    console.log(chunks);
     // Assert
     expect(chunks[0].segments).toEqual(["number", "one"]);
     expect(chunks[1].segments).toEqual(["string", "hello"]);
+    expect(chunks[2].segments).toEqual(["string", "foo"]);
   });
 });

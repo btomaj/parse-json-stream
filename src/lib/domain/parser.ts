@@ -161,44 +161,35 @@ export class JSONParser extends DPDA<
       if (token.symbol) {
         this.transition(token.symbol);
 
-        // TODO this is smelly. "+ 1" because we assume starting stack value is JSONValue.None
-        if (this.stack.length > this.path.length + 1) {
-          if (this.stack[this.stack.length - 1] === JSONValue.Array) {
-            this.path.push(0);
-            continue;
-          }
-          if (this.stack[this.stack.length - 1] === JSONValue.Object) {
+        switch (token.symbol) {
+          case JSONSymbol.LBrace:
             this.path.push("");
-            this.keyBuffer = "";
             this.isBufferingKey = true;
             continue;
+          case JSONSymbol.Comma: {
+            const stackTop = this.stack[this.stack.length - 1];
+            if (stackTop === JSONValue.Object) {
+              this.isBufferingKey = true;
+              continue;
+            }
+            if (stackTop === JSONValue.Array) {
+              (this.path[this.path.length - 1] as number) += 1;
+            }
+            continue;
           }
-        } else if (this.stack.length < this.path.length) {
-          this.path.pop();
-          continue;
+          case JSONSymbol.Colon:
+            this.path[this.path.length - 1] = this.keyBuffer;
+            this.keyBuffer = "";
+            this.isBufferingKey = false;
+            continue;
+          case JSONSymbol.RBrace:
+          case JSONSymbol.RBracket:
+            this.path.pop();
+            continue;
+          case JSONSymbol.LBracket:
+            this.path.push(0);
+            continue;
         }
-
-        if (
-          token.symbol === JSONSymbol.Comma &&
-          this.stack[this.stack.length - 1] === JSONValue.Array
-        ) {
-          (this.path[this.path.length - 1] as number) += 1;
-        } else if (
-          token.symbol === JSONSymbol.Comma &&
-          this.stack[this.stack.length - 1] === JSONValue.Object
-        ) {
-          this.path.pop();
-          this.keyBuffer = "";
-          this.isBufferingKey = true;
-        } else if (
-          token.symbol === JSONSymbol.Colon &&
-          this.stack[this.stack.length - 1] === JSONValue.Object
-        ) {
-          this.path[this.path.length - 1] = this.keyBuffer;
-          this.isBufferingKey = false;
-        }
-
-        continue;
       }
 
       if (this.isBufferingKey && token.type === JSONValue.String) {
