@@ -425,8 +425,8 @@ describe("JSONLexer", () => {
         // Assert
         expect([primitive, ...addendum]).toEqual(expected);
       });
-    },
-  );
+    });
+  });
 
   it("should ignore whitespace surrounding lexemes", () => {
     // Arrange

@@ -460,7 +460,6 @@ describe("JSONParser", () => {
       ),
     );
 
-    console.log(chunks);
     // Assert
     expect(chunks[0].segments).toEqual(["number", "one"]);
     expect(chunks[1].segments).toEqual(["string", "hello"]);
