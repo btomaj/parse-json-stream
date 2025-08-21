@@ -165,10 +165,10 @@ export class JSONChunk {
     }
 
     let result = "";
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; i += 1) {
       result += "/";
       const segment = String(segments[i]);
-      for (let j = 0; j < segment.length; j++) {
+      for (let j = 0; j < segment.length; j += 1) {
         const code = segment.charCodeAt(j);
         if (code === 126) {
           result += "~0";
@@ -190,7 +190,7 @@ export class JSONChunk {
     }
 
     let result = "$";
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; i += 1) {
       const segment = segments[i];
       if (typeof segment === "number") {
         result += `[${segment}]`;
@@ -198,7 +198,7 @@ export class JSONChunk {
         if (this.needsBracketNotation(segment)) {
           result += "['";
           const segLen = segment.length;
-          for (let j = 0; j < segLen; j++) {
+          for (let j = 0; j < segLen; j += 1) {
             const code = segment.charCodeAt(j);
             if (code === 92) {
               result += "\\\\";
@@ -230,7 +230,7 @@ export class JSONChunk {
 
     // Fast path: check if purely numeric
     let isNumeric = true;
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; i += 1) {
       const code = property.charCodeAt(i);
       if (code < 48 || code > 57) {
         isNumeric = false;
@@ -242,7 +242,7 @@ export class JSONChunk {
     }
 
     // Check for special characters using bitmap lookup
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; i += 1) {
       const code = property.charCodeAt(i);
       if (code < 32 || code > 126 || JSONChunk.SPECIAL_CHARS_BITMAP[code]) {
         return true;

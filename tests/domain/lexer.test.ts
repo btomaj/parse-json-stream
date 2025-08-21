@@ -132,7 +132,7 @@ describe("Abstract Lexer", () => {
   it("should throw error when more than 32 states are provided", () => {
     // Arrange
     const tooManyTransitions = [...testTransitions];
-    for (let i = 0; i < 33; i++) {
+    for (let i = 0; i < 33; i += 1) {
       tooManyTransitions.push(
         new FSMTransition(
           `STATE_${i}` as unknown as TestState,
@@ -372,7 +372,7 @@ describe("JSONLexer", () => {
       ["null", [expected, "null"]],
     ])("immediately followed by %O", ([addendum, expected]) => {
       const variants = [];
-      for (let chunkSize = 0; chunkSize < primitive.length; chunkSize++) {
+      for (let chunkSize = 0; chunkSize < primitive.length; chunkSize += 1) {
         // split into two chunks based on chunk size
         if (chunkSize === 0) {
           variants.push([
@@ -409,7 +409,7 @@ describe("JSONLexer", () => {
         const tokens = [];
 
         // Act
-        for (let i = 0; i < variant.length; i++) {
+        for (let i = 0; i < variant.length; i += 1) {
           tokens.push(...lexer.tokenise(variant[i]));
         }
 

@@ -16,7 +16,7 @@ class StructureBuilder {
 
     let curr: any = this.root;
 
-    for (let i = 0; i < path.length; i++) {
+    for (let i = 0; i < path.length; i += 1) {
       const key = path[i];
       const isLast = i === path.length - 1;
 
@@ -45,7 +45,7 @@ class StructureBuilder {
 
 describe("flat objects", () => {
   const variants = [];
-  for (let chunkSize = 0; chunkSize < flatObject.length + 1; chunkSize++) {
+  for (let chunkSize = 0; chunkSize < object.length + 1; chunkSize += 1) {
     // split into two chunks based on chunk size
     variants.push([
       flatObject.slice(0, chunkSize),

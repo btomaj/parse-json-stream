@@ -262,7 +262,7 @@ export abstract class Lexer<
     chunk: string,
     startIndex = 0,
   ): [number, Input[keyof Input] | null] {
-    for (let i = startIndex; i < chunk.length; i++) {
+    for (let i = startIndex; i < chunk.length; i += 1) {
       const code = chunk.charCodeAt(i);
       if (
         // bitwise AND
@@ -375,7 +375,7 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
     } else {
       // unicode escape sequence \uXXXX
       let codePoint = 0;
-      for (let i = 2; i < 6; i++) {
+      for (let i = 2; i < 6; i += 1) {
         const unicodeCharacterCode = buffer[i];
         let hexDigit: number;
         if (unicodeCharacterCode >= 48 && unicodeCharacterCode <= 57) {

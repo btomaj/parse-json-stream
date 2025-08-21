@@ -8,7 +8,7 @@ describe("Array Parsing", () => {
 
   describe("should parse flat arrays", () => {
     const variants = [];
-    for (let chunkSize = 0; chunkSize < flatArray.length + 1; chunkSize++) {
+    for (let chunkSize = 0; chunkSize < flatArray.length + 1; chunkSize += 1) {
       // split into two chunks based on chunk size
       variants.push({
         chunks: [flatArray.slice(0, chunkSize), flatArray.slice(chunkSize)],
@@ -32,7 +32,11 @@ describe("Array Parsing", () => {
 
   describe("should parse nested arrays", () => {
     const variants = [];
-    for (let chunkSize = 0; chunkSize < nestedArray.length + 1; chunkSize++) {
+    for (
+      let chunkSize = 0;
+      chunkSize < nestedArray.length + 1;
+      chunkSize += 1
+    ) {
       // split into two chunks based on chunk size
       variants.push({
         chunks: [nestedArray.slice(0, chunkSize), nestedArray.slice(chunkSize)],
