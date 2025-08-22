@@ -164,31 +164,31 @@ const objectTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.True, // we find the letter t
     JSONValue.Object, // inside an object,
-    JSONValue.True, // so the next value is a true literal, and
-    [JSONValue.Object, JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Object, JSONValue.Boolean], // we step inside the boolean
   ),
   /* Close object value: true (whitespace) [duplicate]
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so await JSONSymbol.Comma, or JSONSymbol.RBrace, and
     [], // return to the parent
   ),
   */
   // Close object value: true (comma)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Comma, // we find a comma
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   // Close object value: true (object close)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.RBrace, // we find a right brace
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
@@ -197,31 +197,31 @@ const objectTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.False, // we find the letter f
     JSONValue.Object, // inside an object,
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.Object, JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Object, JSONValue.Boolean], // we step inside the boolean
   ),
   /* Close object value: false (whitespace) [duplicate]
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we await JSONSymbol.Comma, or JSONSymbol.RBrace, and
     [], // return to the parent
   ),
   */
   // Close object value: false (comma)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Comma, // we find a comma
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   // Close object value: false (object close)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.RBrace, // we find a right brace
-    JSONValue.Object, // after the false literal,
+    JSONValue.Object, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
@@ -387,32 +387,32 @@ const arrayTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.True, // we find the letter t
     JSONValue.Array, // inside an array,
-    JSONValue.True, // so the next value is a true literal, and
-    [JSONValue.Array, JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Array, JSONValue.Boolean], // we step inside the boolean
   ),
   /* Close array element: true (whitespace) [duplicate]
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we await JSONSymbol.Comma, or JSONSymbol.RBracket, and
     [], // return to the parent
   ),
   */
   /* Close array element: true (comma) [duplicate]
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Comma, // we find a comma
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   */
   // Close array element: true (array close)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.RBracket, // we find a right bracket
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
@@ -421,32 +421,32 @@ const arrayTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.False, // we find the letter f
     JSONValue.Array, // inside an array
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.Array, JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Array, JSONValue.Boolean], // we step inside the boolean
   ),
   /* Close array element: false (whitespace) [duplicate]
   new JSONTransition(
-    JSONValue.False, // Value is the boolean false, and
+    JSONValue.Boolean, // Value is the boolean false, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we await JSONSymbol.Comma, or JSONSymbol.RBracket, and
     [], // return to the parent
   ),
   */
   /* Close array element: false (comma) [duplicate]
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Comma, // we find a comma
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   */
   // Close array element: false (array close)
   new JSONTransition(
-    JSONValue.False, // Value is the false literal, and
+    JSONValue.Boolean, // Value is the boolean, and
     JSONSymbol.RBracket, // we find a right bracket
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
@@ -559,16 +559,16 @@ const numberTransitions: Array<JSONTransition> = [
     JSONValue.Number, // Value is a number, and
     JSONSymbol.True, // we find the letter t
     JSONValue.Number, // after a number,
-    JSONValue.True, // so the next value is true literal, and
-    [JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // so the next value is boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close number (false start)
   new JSONTransition(
     JSONValue.Number, // Value is a number, and
     JSONSymbol.False, // we find the letter f
     JSONValue.Number, // after a number,
-    JSONValue.False, // so the next value is false literal, and
-    [JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // so the next value is boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close number (null start)
   new JSONTransition(
@@ -586,70 +586,70 @@ const trueTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.True, // we find the letter t
     JSONValue.None, // without context,
-    JSONValue.True, // so we've found a true literal, and
-    [JSONValue.None, JSONValue.True], // step inside the true literal
+    JSONValue.Boolean, // so we've found a boolean, and
+    [JSONValue.None, JSONValue.Boolean], // step inside the boolean
   ),
   // Close true (whitespace)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   // Close true (object start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.LBrace, // we find a left brace
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a key, and
     [JSONValue.Object], // step inside the object
   ),
   // Close true (array start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.LBracket, // we find a left bracket
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [JSONValue.Array], // step inside the array
   ),
   // Close true (string start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.String, // we find a quotation mark
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.String, // so the next value is a string, and
     [JSONValue.String], // we step inside the string
   ),
   // Close true (number start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Number, // we find a digit
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Number], // we step inside the number
   ),
   // Close true (true start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.True, // we find the letter t
-    JSONValue.True, // after the true literal,
-    JSONValue.True, // so the next value is a true literal, and
-    [JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // after the boolean,
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close true (false start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.False, // we find the letter f
-    JSONValue.True, // after the true literal,
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // after the boolean,
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close true (null start)
   new JSONTransition(
-    JSONValue.True, // Value is true literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Null, // we find the letter n
-    JSONValue.True, // after the true literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.Null, // so the next value is a null literal, and
     [JSONValue.Null], // we step inside the null literal
   ),
@@ -661,70 +661,70 @@ const falseTransitions: Array<JSONTransition> = [
     JSONValue.None, // We're waiting for a value, and
     JSONSymbol.False, // we find the letter f
     JSONValue.None, // without context
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.None, JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.None, JSONValue.Boolean], // we step inside the boolean
   ),
   // Close false (whitespace)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Whitespace, // we find a whitespace
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [], // return to the parent
   ),
   // Close false (object start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.LBrace, // we find a left brace
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a key, and
     [JSONValue.Object], // step inside the object
   ),
   // Close false (array start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.LBracket, // we find a left bracket
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.None, // so we're looking for a value, and
     [JSONValue.Array], // step inside the array
   ),
   // Close false (string start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.String, // we find a quotation mark
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.String, // so the next value is a string, and
     [JSONValue.String], // we step inside the string
   ),
   // Close false (number start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Number, // we find a digit
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.Number, // so the next value is a number, and
     [JSONValue.Number], // we step inside the number
   ),
   // Close false (true start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.True, // we find the letter t
-    JSONValue.False, // after the false literal,
-    JSONValue.True, // so the next value is a true literal, and
-    [JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // after the boolean,
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close false (false start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.False, // we find the letter f
-    JSONValue.False, // after the false literal,
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // after the boolean,
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close false (null start)
   new JSONTransition(
-    JSONValue.False, // Value is false literal, and
+    JSONValue.Boolean, // Value is boolean, and
     JSONSymbol.Null, // we find the letter n
-    JSONValue.False, // after the false literal,
+    JSONValue.Boolean, // after the boolean,
     JSONValue.Null, // so the next value is a null literal, and
     [JSONValue.Null], // we step inside the null literal
   ),
@@ -784,16 +784,16 @@ const nullTransitions: Array<JSONTransition> = [
     JSONValue.Null, // Value is null literal, and
     JSONSymbol.True, // we find the letter t
     JSONValue.Null, // after the null literal,
-    JSONValue.True, // so the next value is a true literal, and
-    [JSONValue.True], // we step inside the true literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close null (false start)
   new JSONTransition(
     JSONValue.Null, // Value is null literal, and
     JSONSymbol.False, // we find the letter f
     JSONValue.Null, // after the null literal,
-    JSONValue.False, // so the next value is a false literal, and
-    [JSONValue.False], // we step inside the false literal
+    JSONValue.Boolean, // so the next value is a boolean, and
+    [JSONValue.Boolean], // we step inside the boolean
   ),
   // Close null (null start)
   new JSONTransition(

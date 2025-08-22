@@ -4,8 +4,7 @@ export enum JSONValue {
   Array = "array",
   String = "string",
   Number = "number",
-  True = "true",
-  False = "false",
+  Boolean = "boolean",
   Null = "null",
 }
 

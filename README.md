@@ -4,11 +4,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
-High-performance, real-time JSON streaming parser that parses and returns values as they arrive from the stream (before the complete value has been streamed). This library was built to parse structured JSON returned from LLMs, and display the values to users immediately as they arrive.
+High-performance, real-time, JSON stream parser that parses and yields partial values as they arrive from a stream (before the complete value has been streamed). This library was built to parse structured JSON returned from LLMs, and display the values to users immediately as they arrive.
 
 ## ✨ Key Features
 
-- **🚀 Real-time parsing** - Values are emitted as soon as they arrive from the stream
+- **🚀 Real-time parsing** - Values are yielded as soon as they arrive from the stream
 - **🌊 Strong browser support** - Works with ReadableStream, WebSocket, EventSource, and AsyncIterable
 - **📍 Path tracking** - Every value includes its JSONPath and JSON pointer location
 - **⚡ Lightweight and fast** - Optimised to minimise CPU cycles and memory allocation. Zero dependencies.
@@ -74,6 +74,17 @@ Parses a JSON stream and yields `JSONChunk` objects as values are parsed.
 
 ### JSONChunk
 
+**Note:** `value` is always returned as a string. Parse numbers/booleans/nulls as needed after the value has been streamed to completion. Values have been streamed to completion a chunk of the next value is yielded, and when the stream is completed. Use the chunk type to determine how to parse, for example:
+```typescript
+if (chunk.type === 'number') {
+  const numValue = parseFloat(chunk.value);
+}
+if (chunk.type === 'boolean') {
+  const boolValue = chunk.type === 'true';
+}
+if (chunk.type === 'null') { ... }
+```
+
 Each chunk represents a parsed JSON primitive value with its location:
 
 ```typescript
@@ -83,16 +94,6 @@ interface JSONChunk {
   path: string;              // JavaScript-style path: "$.users[0].name"
   pointer: string;           // JSON Pointer: "/users/0/name"
   segments: Array<string|number>; // Path segments: ["users", 0, "name"]
-}
-```
-
-**Note:** `value` is always returned as a string. Parse numbers/booleans as needed:
-```typescript
-if (chunk.type === 'number') {
-  const numValue = parseFloat(chunk.value);
-}
-if (chunk.type === 'true' || chunk.type === 'false') {
-  const boolValue = chunk.type === 'true';
 }
 ```
 
@@ -200,6 +201,7 @@ for await (const chunk of parseStream(stream)) {
 The library is under active development, and contributions are warmly welcomed!
 
 TODO
+- [ ] Clean up redundant JSONTransitions
 - [ ] Buffer incomplete non-string primitives between chunks in JSONLexer.tokenise()
 - [ ] Look for opportunities to move reusable logic from JSONLexer to abstract Lexer
 - [ ] Deduplicate calls to DPDA.transition() in JSONParser and FSM.transition() JSONLexer, and refactor into 3D array.
