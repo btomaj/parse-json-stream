@@ -1,6 +1,6 @@
 {
   "name": "parse-json-stream",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "High-performance, real-time, JSON stream parser that yields partial values as they arrive from a stream. Perfect for parsing JSON from LLMs and displaying values immediately.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
