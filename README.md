@@ -4,22 +4,21 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
-High-performance, real-time, JSON stream parser that parses and yields partial values as they arrive from a stream (before the complete value has been streamed). This library was built to parse structured JSON returned from LLMs, and display the values to users immediately as they arrive.
+High-performance, real-time, JSON stream parser that parses and yields partial values as they arrive from a stream (before the complete value has been streamed). This library was built to parse JSON returned from LLMs, and display the values to users immediately as they arrive.
 
-## ✨ Key Features
+## Key features
 
-- **🚀 Real-time parsing** - Values are yielded as soon as they arrive from the stream
-- **🌊 Strong browser support** - Works with ReadableStream, WebSocket, EventSource, and AsyncIterable
-- **📍 Path tracking** - Every value includes its JSONPath and JSON pointer location
-- **⚡ Lightweight and fast** - Optimised to minimise CPU cycles and memory allocation. Zero dependencies.
+- **Real-time parsing** - Values are yielded as soon as they arrive from the stream
+- **Strong browser support** - Works with ReadableStream, WebSocket, EventSource, and AsyncIterable
+- **Lightweight and fast** - Optimised to minimise CPU cycles and memory allocation. Zero dependencies.
 
-## Installation
+## Instalation
 
 ```bash
 npm install parse-json-stream
 ```
 
-## Quick Start
+## Quick start
 
 ```typescript
 import { parseStream } from 'parse-json-stream';
@@ -49,23 +48,23 @@ for await (const chunk of JSON.parseStream(stream)) {
 ```
 
 
-## Why This Library?
+## Why another JSON parsing library?
 
-Existing libraries wait for each JSON value to stream to completion before parsing and returning it, resulting in a poor UX with the dreaded waiting wheel.
+Existing libraries wait for each JSON value to stream to completion before parsing and returning it, resulting in a poor UX with the dreaded spinning wheel.
 
 | Existing libraries | parse-json-stream |
 |---------------------|------------------|
-| ⏳ Waits for complete value | ✅ Parses incomplete values as they arrive from the stream |
-| 🐌 Blocks until entire value is received | ⚡ Immediately show partial responses to users |
-| 😴 Keeps users waiting | 🎯 Progressive parsing |
+| ⏳ Wait for complete value before parsing | ✅ Parses partial values as they arrive from the stream |
+| 🐌 Block until entire value is received | ⚡ Immediately show partial responses to users |
+| 😴 Keep users waiting | 🎯 Progressive parsing |
 
-When requesting structured JSON from an LLM, existing parsers keep the user waiting for the complete value to stream. With `parse-json-stream`, you can show the LLM JSON response values to users in real-time as they're streamed to the client.
+When requesting JSON from an LLM, existing parsers keep the user waiting for the value to stream to completion. With `parse-json-stream`, you can display the LLM generated JSON values in real-time, as they're streamed to the client.
 
 ## API Reference
 
 ### `parseStream(stream)`
 
-Parses a JSON stream and yields `JSONChunk` objects as values are parsed.
+Parses a JSON stream, and yields `JSONChunk`s as values are parsed.
 
 **Parameters:**
 - `stream`: `ReadableStream | EventSource | WebSocket | AsyncIterable<string | Uint8Array | ArrayBuffer>`
@@ -74,7 +73,20 @@ Parses a JSON stream and yields `JSONChunk` objects as values are parsed.
 
 ### JSONChunk
 
-**Note:** `value` is always returned as a string. Parse numbers/booleans/nulls as needed after the value has been streamed to completion. Values have been streamed to completion a chunk of the next value is yielded, and when the stream is completed. Use the chunk type to determine how to parse, for example:
+
+Each JSONChunk represents a partial JSON primitive, and carries metadata describing its location in the JSON.
+
+```typescript
+interface JSONChunk {
+  value: string;                    // The parsed value (always a string)
+  type: JSONValue;                  // "string" | "number" | "true" | "false" | "null"
+  path: string;                     // JavaScript-style path: "$.users[0].name"
+  pointer: string;                  // JSON Pointer: "/users/0/name"
+  segments: Array<string | number>; // Path segments: ["users", 0, "name"]
+}
+```
+
+**Note:** `value` is always returned as a string. Parse numbers/booleans/nulls as needed after the value has been streamed to completion. Values have been streamed to completion when a chunk of the next value is yielded, and when the stream is completed. Use the chunk type to determine how to parse, for example:
 ```typescript
 if (chunk.type === 'number') {
   const numValue = parseFloat(chunk.value);
@@ -85,21 +97,41 @@ if (chunk.type === 'boolean') {
 if (chunk.type === 'null') { ... }
 ```
 
-Each chunk represents a parsed JSON primitive value with its location:
+The location metadata is accessible through `path`, `pointer`, or `segments` on the JSONChunk object. For example:
 
-```typescript
-interface JSONChunk {
-  value: string;              // The parsed value (always a string)
-  type: JSONValue;           // "string" | "number" | "true" | "false" | "null"
-  path: string;              // JavaScript-style path: "$.users[0].name"
-  pointer: string;           // JSON Pointer: "/users/0/name"
-  segments: Array<string|number>; // Path segments: ["users", 0, "name"]
+```json
+{
+  "user": {
+    "name": "Alice",
+    "age": 30,
+    "contacts": [
+      "alice@example.com",
+      "+1-555-0123"
+    ],
+    "settings": {
+      "theme": "dark",
+      "notifications": true
+    }
+  },
+  "status": "active"
 }
 ```
 
+...yields JSONChunks with the following paths:
+
+| Segments | Path | Pointer |
+|----------|------|---------|
+| `["user", "name"]` | `$.user.name` | `/user/name` |
+| `["user", "age"]` | `$.user.age` | `/user/age` |
+| `["user", "contacts", 0]` | `$.user.contacts[0]` | `/user/contacts/0` |
+| `["user", "contacts", 1]` | `$.user.contacts[1]` | `/user/contacts/1` |
+| `["user", "settings", "theme"]` | `$.user.settings.theme` | `/user/settings/theme` |
+| `["user", "settings", "notifications"]` | `$.user.settings.notifications` | `/user/settings/notifications` |
+| `["status"]` | `$.status` | `/status` |
+
 ## Stream Sources
 
-Works seamlessly with multiple stream types:
+The library works seamlessly with ReadableStreams, WebSockets, server-sent events (EventSource), and AsyncIterables:
 
 ### ReadableStream
 ```typescript
@@ -193,14 +225,25 @@ for await (const chunk of parseStream(stream)) {
   if (chunk.path.startsWith('$.users[') && chunk.path.endsWith('.email')) {
     validateEmail(chunk.value);
   }
+  if (chunk.path === '$.user.name') {
+    console.log('User name:', chunk.value);
+  }
+
+  if (chunk.path.startsWith('$.user.contacts[')) {
+    console.log('Contact info:', chunk.value);
+  }
+
+  if (chunk.segments.length === 3 && chunk.segments[1] === 'settings') {
+    console.log(`Setting ${chunk.segments[2]}:`, chunk.value);
+  }
 }
 ```
 
 ## Contributing
 
-The library is under active development, and contributions are warmly welcomed!
+The library is under active development, and contributions are warmly welcomed.
 
-TODO
+## To do
 - [ ] Clean up redundant JSONTransitions
 - [ ] Buffer incomplete non-string primitives between chunks in JSONLexer.tokenise()
 - [ ] Look for opportunities to move reusable logic from JSONLexer to abstract Lexer
