@@ -1,0 +1,43 @@
+# Source files
+src/
+tests/
+
+# Development files
+*.test.ts
+*.test.js
+.gitignore
+.npmignore
+
+# Build tools
+tsconfig.json
+vitest.config.ts
+biome.json
+pnpm-workspace.yaml
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage reports
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Packed files
+*.tgz

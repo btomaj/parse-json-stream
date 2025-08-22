@@ -1,0 +1,68 @@
+{
+  "name": "parse-json-stream",
+  "version": "3.0.0",
+  "description": "High-performance, real-time, JSON stream parser that yields partial values as they arrive from a stream. Perfect for parsing JSON from LLMs and displaying values immediately.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./patch": {
+      "types": "./dist/patch.d.ts",
+      "default": "./dist/patch.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias",
+    "test": "NODE_OPTIONS=--experimental-eventsource vitest run",
+    "typecheck": "tsc --noEmit",
+    "format": "biome check --write",
+    "pack": "npm pack && tar -tzf *.tgz"
+  },
+  "keywords": [
+    "json",
+    "stream",
+    "parser",
+    "streaming",
+    "llm",
+    "real-time",
+    "progressive",
+    "async",
+    "generator",
+    "typescript"
+  ],
+  "author": "Tomaj Bayat",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/btomaj/parse-json-stream.git"
+  },
+  "homepage": "https://github.com/btomaj/parse-json-stream#readme",
+  "bugs": {
+    "url": "https://github.com/btomaj/parse-json-stream/issues"
+  },
+  "license": "ISC",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "packageManager": "pnpm@10.15.0+sha512.486ebc259d3e999a4e8691ce03b5cac4a71cbeca39372a9b762cb500cfdf0873e2cb16abe3d951b1ee2cf012503f027b98b6584e4df22524e0c7450d9ec7aa7b",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@types/node": "^22.15.29",
+    "@vitest/coverage-v8": "3.1.4",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.8.3",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.1.4"
+  }
+}
