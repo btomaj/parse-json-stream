@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/tests/test-reports"]
+    "includes": ["**", "!tests/test-reports", "!dist"]
   },
   "formatter": {
     "enabled": true,
