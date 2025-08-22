@@ -1,176 +1,122 @@
 import { describe, expect, it } from "vitest";
 import { parseStream } from "~/index";
 
-class StructureBuilder {
-  // biome-ignore lint/suspicious/noExplicitAny: JSON \/*.*\/
-  private root: any = null;
-
-  set(path: Array<string | number>, value: string): void {
-    if (this.root === null) {
-      this.root = typeof path[0] === "number" ? [] : {};
-    }
-
-    let curr = this.root;
-
-    for (let i = 0; i < path.length; i += 1) {
-      const key = path[i];
-      const isLast = i === path.length - 1;
-      const nextKey = path[i + 1];
-
-      if (isLast) {
-        // Leaf: concatenate JSON value
-        if (curr[key] === undefined) {
-          curr[key] = "";
-        }
-        curr[key] += value;
-      } else {
-        // Non-leaf: create container if missing
-        if (curr[key] === undefined) {
-          curr[key] = typeof nextKey === "number" ? [] : {};
-        } else if (typeof nextKey === "number" && !Array.isArray(curr[key])) {
-          curr[key] = [];
-        } else if (
-          typeof nextKey !== "number" &&
-          typeof curr[key] !== "object"
-        ) {
-          curr[key] = {};
-        }
-
-        curr = curr[key];
-      }
-    }
-  }
-
-  getStructure() {
-    return this.root;
-  }
-}
-
 describe.for([
   [
     '{"false":false,"true":true,"null":null,"zero":0,"integer":42,"negative_integer":-17,"float":3.14159,"negative_float":-0.001,"scientific_positive":1.23e10,"scientific_negative":-4.56E-7,"scientific_plus":1e+5,"string":"Hello World","empty_string":"","escaped_quote": "\\"","escaped_backslash": "\\\\", "escaped_forwardslash": "\\/", "escaped_backspace": "\\b", "escaped_formfeed": "\\f", "escaped_newline": "\\n", "escaped_carriagereturn": "\\r", "escaped_tab": "\\t", "escaped_unicode": "\\u2764","empty_object":{},"empty_array":[]}',
-    {
-      escaped_backslash: "\\",
-      escaped_backspace: "\b",
-      escaped_carriagereturn: "\r",
-      escaped_formfeed: "\f",
-      escaped_forwardslash: "\/",
-      escaped_newline: "\n",
-      escaped_quote: '\"',
-      escaped_tab: "\t",
-      escaped_unicode: "\u2764",
-      false: "false",
-      float: "3.14159",
-      integer: "42",
-      negative_float: "-0.001",
-      negative_integer: "-17",
-      null: "null",
-      scientific_negative: "-4.56E-7",
-      scientific_plus: "1e+5",
-      scientific_positive: "1.23e10",
-      string: "Hello World",
-      true: "true",
-      zero: "0",
-    },
+    [
+      [["false"], "false"],
+      [["true"], "true"],
+      [["null"], "null"],
+      [["zero"], "0"],
+      [["integer"], "42"],
+      [["negative_integer"], "-17"],
+      [["float"], "3.14159"],
+      [["negative_float"], "-0.001"],
+      [["scientific_positive"], "1.23e10"],
+      [["scientific_negative"], "-4.56E-7"],
+      [["scientific_plus"], "1e+5"],
+      [["string"], "Hello World"],
+      [["escaped_quote"], '"'],
+      [["escaped_backslash"], "\\"],
+      [["escaped_forwardslash"], "/"],
+      [["escaped_backspace"], "\b"],
+      [["escaped_formfeed"], "\f"],
+      [["escaped_newline"], "\n"],
+      [["escaped_carriagereturn"], "\r"],
+      [["escaped_tab"], "\t"],
+      [["escaped_unicode"], "\u2764"],
+    ],
   ],
   [
-    '{"primitives":{"false":false,"true":true,"null":null},"numbers":{"zero":0,"integer":42,"negative_integer":-17,"float":3.14159,"negative_float":-0.001,"scientific_positive":1.23e10,"scientific_negative":-4.56E-7,"scientific_plus":1e+5},"strings":{"string":"Hello World","empty_string":"","escaped_quote": "\\"","escaped_backslash": "\\\\", "escaped_forwardslash": "\\/", "escaped_backspace": "\\b", "escaped_formfeed": "\\f", "escaped_newline": "\\n", "escaped_carriagereturn": "\\r", "escaped_tab": "\\t", "escaped_unicode": "\\u2764"},"containers":{"empty_object":{},"empty_array":[],"level2":[{"level4": {"null": null, "false": false, "true": true, "meaning_of_life": 42, "string": "deep thought"}}]}}',
-    {
-      strings: {
-        string: "Hello World",
-        escaped_unicode: "\u2764",
-        escaped_backslash: "\\",
-        escaped_backspace: "\b",
-        escaped_carriagereturn: "\r",
-        escaped_formfeed: "\f",
-        escaped_forwardslash: "\/",
-        escaped_newline: "\n",
-        escaped_quote: '\"',
-        escaped_tab: "\t",
-      },
-      numbers: {
-        float: "3.14159",
-        integer: "42",
-        negative_float: "-0.001",
-        negative_integer: "-17",
-        scientific_negative: "-4.56E-7",
-        scientific_plus: "1e+5",
-        scientific_positive: "1.23e10",
-        zero: "0",
-      },
-      primitives: {
-        true: "true",
-        false: "false",
-        null: "null",
-      },
-      containers: {
-        level2: [
-          {
-            level4: {
-              null: "null",
-              false: "false",
-              true: "true",
-              meaning_of_life: "42",
-              string: "deep thought",
-            },
-          },
-        ],
-      },
-    },
+    '{"primitives":{"true":true,"false":false,"null":null},"numbers":{"zero":0,"integer":42,"negative_integer":-17,"float":3.14159,"negative_float":-0.001,"scientific_positive":1.23e10,"scientific_negative":-4.56E-7,"scientific_plus":1e+5},"strings":{"string":"Hello World","empty_string":"","escaped_quote": "\\"","escaped_backslash": "\\\\", "escaped_forwardslash": "\\/", "escaped_backspace": "\\b", "escaped_formfeed": "\\f", "escaped_newline": "\\n", "escaped_carriagereturn": "\\r", "escaped_tab": "\\t", "escaped_unicode": "\\u2764"},"containers":{"empty_object":{},"empty_array":[],"level2":[{"level4": {"null": null, "false": false, "true": true, "meaning_of_life": 42, "string": "deep thought"}}]}}',
+    [
+      [["primitives", "true"], "true"],
+      [["primitives", "false"], "false"],
+      [["primitives", "null"], "null"],
+      [["numbers", "zero"], "0"],
+      [["numbers", "integer"], "42"],
+      [["numbers", "negative_integer"], "-17"],
+      [["numbers", "float"], "3.14159"],
+      [["numbers", "negative_float"], "-0.001"],
+      [["numbers", "scientific_positive"], "1.23e10"],
+      [["numbers", "scientific_negative"], "-4.56E-7"],
+      [["numbers", "scientific_plus"], "1e+5"],
+      [["strings", "string"], "Hello World"],
+      [["strings", "escaped_quote"], '"'],
+      [["strings", "escaped_backslash"], "\\"],
+      [["strings", "escaped_forwardslash"], "/"],
+      [["strings", "escaped_backspace"], "\b"],
+      [["strings", "escaped_formfeed"], "\f"],
+      [["strings", "escaped_newline"], "\n"],
+      [["strings", "escaped_carriagereturn"], "\r"],
+      [["strings", "escaped_tab"], "\t"],
+      [["strings", "escaped_unicode"], "\u2764"],
+      [["containers", "level2", 0, "level4", "null"], "null"],
+      [["containers", "level2", 0, "level4", "false"], "false"],
+      [["containers", "level2", 0, "level4", "true"], "true"],
+      [["containers", "level2", 0, "level4", "meaning_of_life"], "42"],
+      [["containers", "level2", 0, "level4", "string"], "deep thought"],
+    ],
   ],
   [
     '[false,null,true,0,42,-17,3.14159,-0.001,1.23e10,-4.56E-7,1e+5,"Hello World","","\\"","\\\\","\\/","\\b","\\f","\\n","\\r","\\t","\\u0041",{},[]]',
     [
-      "false",
-      "null",
-      "true",
-      "0",
-      "42",
-      "-17",
-      "3.14159",
-      "-0.001",
-      "1.23e10",
-      "-4.56E-7",
-      "1e+5",
-      "Hello World",
-      undefined,
-      '"',
-      "\\",
-      "/",
-      "\b",
-      "\f",
-      "\n",
-      "\r",
-      "\t",
-      "\u0041",
+      [[0], "false"],
+      [[1], "null"],
+      [[2], "true"],
+      [[3], "0"],
+      [[4], "42"],
+      [[5], "-17"],
+      [[6], "3.14159"],
+      [[7], "-0.001"],
+      [[8], "1.23e10"],
+      [[9], "-4.56E-7"],
+      [[10], "1e+5"],
+      [[11], "Hello World"],
+      [[13], '"'],
+      [[14], "\\"],
+      [[15], "/"],
+      [[16], "\b"],
+      [[17], "\f"],
+      [[18], "\n"],
+      [[19], "\r"],
+      [[20], "\t"],
+      [[21], "\u0041"],
     ],
   ],
   [
     '[[false,null,true],[0,42,-17,3.14159,-0.001,1.23e10,-4.56E-7,1e+5],["Hello World","","\\"","\\\\","\\/","\\b","\\f","\\n","\\r","\\t","\\u0041"],[{},[],[{"level4":[null,false,true,42,"deep thought"]},[]]]]',
     [
-      ["false", "null", "true"],
-      ["0", "42", "-17", "3.14159", "-0.001", "1.23e10", "-4.56E-7", "1e+5"],
-      [
-        "Hello World",
-        undefined,
-        '"',
-        "\\",
-        "/",
-        "\b",
-        "\f",
-        "\n",
-        "\r",
-        "\t",
-        "\u0041",
-      ],
-      [
-        undefined,
-        undefined,
-        [{ level4: ["null", "false", "true", "42", "deep thought"] }],
-      ],
+      [[0, 0], "false"],
+      [[0, 1], "null"],
+      [[0, 2], "true"],
+      [[1, 0], "0"],
+      [[1, 1], "42"],
+      [[1, 2], "-17"],
+      [[1, 3], "3.14159"],
+      [[1, 4], "-0.001"],
+      [[1, 5], "1.23e10"],
+      [[1, 6], "-4.56E-7"],
+      [[1, 7], "1e+5"],
+      [[2, 0], "Hello World"],
+      [[2, 2], '"'],
+      [[2, 3], "\\"],
+      [[2, 4], "/"],
+      [[2, 5], "\b"],
+      [[2, 6], "\f"],
+      [[2, 7], "\n"],
+      [[2, 8], "\r"],
+      [[2, 9], "\t"],
+      [[2, 10], "\u0041"],
+      [[3, 2, 0, "level4", 0], "null"],
+      [[3, 2, 0, "level4", 1], "false"],
+      [[3, 2, 0, "level4", 2], "true"],
+      [[3, 2, 0, "level4", 3], "42"],
+      [[3, 2, 0, "level4", 4], "deep thought"],
     ],
   ],
-])("objects", ([json, expected]) => {
+])("parseStream should parse JSON values", ([json, expected]) => {
   const variants = [];
   const jsonString = json as string;
   for (let chunkSize = 0; chunkSize < jsonString.length + 1; chunkSize += 1) {
@@ -194,8 +140,10 @@ describe.for([
     variants.push(chunks);
   }
 
-  describe.for(variants)("split into chunks", (variant) => {
-    it("should aggregate to original object", async () => {
+  it.for(variants)(
+    "for chunk variation #%$ from ReadableStream",
+    async (variant) => {
+      // Arrange
       const readableStream = new ReadableStream({
         start(controller) {
           for (const chunk of variant) {
@@ -204,14 +152,70 @@ describe.for([
           controller.close();
         },
       });
-      const builder = new StructureBuilder();
       const jsonChunks = parseStream(readableStream);
+      const chunks = new Map<
+        string,
+        { segments: Array<string | number>; value: string }
+      >();
 
+      // Act
       for await (const chunk of jsonChunks) {
-        builder.set(chunk.segments, chunk.value);
+        const segments = JSON.stringify(chunk.segments);
+        if (chunks.has(segments)) {
+          // biome-ignore lint/style/noNonNullAssertion: guarded by if statment
+          chunks.get(segments)!.value += chunk.value;
+        } else {
+          chunks.set(segments, {
+            segments: chunk.segments,
+            value: chunk.value,
+          });
+        }
       }
 
-      expect(builder.getStructure()).toEqual(expected);
-    });
-  });
+      // Assert
+      expect(
+        Array.from(chunks.values(), ({ segments, value }) => [segments, value]),
+      ).toEqual(expected);
+    },
+  );
+
+  it.for(variants)(
+    "for chunk variation #%$ from AsyncIterable",
+    async (variant) => {
+      // Arrange
+      async function* asyncIterable() {
+        for (const chunk of variant) {
+          yield chunk;
+        }
+      }
+      const jsonChunks = parseStream(asyncIterable());
+      const chunks = new Map<
+        string,
+        { segments: Array<string | number>; value: string }
+      >();
+
+      // Act
+      for await (const chunk of jsonChunks) {
+        const segments = JSON.stringify(chunk.segments);
+        if (chunks.has(segments)) {
+          // biome-ignore lint/style/noNonNullAssertion: guarded by if statment
+          chunks.get(segments)!.value += chunk.value;
+        } else {
+          chunks.set(segments, {
+            segments: chunk.segments,
+            value: chunk.value,
+          });
+        }
+      }
+
+      // Assert
+      expect(
+        Array.from(chunks.values(), ({ segments, value }) => [segments, value]),
+      ).toEqual(expected);
+    },
+  );
+
+  // cannot test WebSockets, nor EventSource
+  it.skip("for chunk variation #%$ from WebSocket");
+  it.skip("for chunk variation #%$ from EventSource");
 });

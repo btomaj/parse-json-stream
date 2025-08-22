@@ -61,7 +61,7 @@ describe("JSONChunk", () => {
     ["~", "tilde~key", "$['tilde~key']", "/tilde~0key"],
     ["", "", "$['']", "/"],
   ])(
-    "should escape special character '%s' in JSONPath and JSON Pointer",
+    "should escape special character '%s' for JSONPath and JSON Pointer",
     ([_, key, path, pointer]) => {
       // Arrange & Act
       const chunk = new JSONChunk("", 0, 0, JSONValue.String, [key]);
