@@ -1,3 +1,17 @@
+/**
+ * Processes string, Uint8Array, or ArrayBuffer data from a ReadableStream into
+ * a string AsyncIterable.
+ *
+ * @example
+ * ```typescript
+ * const response = await fetch('/api/stream');
+ * const processor = new ReadableStreamProcessor(response.body);
+ *
+ * for await (const chunk of processor) {
+ *   console.log('Received chunk:', chunk);
+ * }
+ * ```
+ */
 export class ReadableStreamProcessor implements AsyncIterable<string> {
   private reader: ReadableStreamDefaultReader<
     string | Uint8Array | ArrayBuffer
@@ -5,17 +19,31 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
   private decoder = new TextDecoder();
   private abortController = new AbortController();
 
+  /**
+   * Creates a new ReadableStreamProcessor.
+   * @param stream The ReadableStream to process.
+   */
   constructor(
     private stream: ReadableStream<string | Uint8Array | ArrayBuffer>,
   ) {
     this.reader = this.stream.getReader();
   }
 
+  /**
+   * Aborts the processing operation, and cancels the underlying reader.
+   */
   stop(): void {
     this.abortController.abort();
     this.reader.cancel();
   }
 
+  /**
+   * Yields strings from chunks from the ReadableStream until the stream is
+   * completed, or aborted, converting each chunk to a string. Reader lock is
+   * automatically released when finished.
+   *
+   * @yields String chunks decoded from the stream
+   */
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     try {
       while (!this.abortController.signal.aborted) {
@@ -32,6 +60,14 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
     }
   }
 
+  /**
+   * Decodes ArrayBuffer/TypedArray chunk into a string using TextDecoder.
+   *
+   * @param value The chunk value to decode
+   * @returns The decoded string
+   * @throws Error if the chunk type is unsupported
+   * @private
+   */
   private decodeChunk(value: string | ArrayBuffer): string {
     if (typeof value === "string") {
       return value;
@@ -46,12 +82,29 @@ export class ReadableStreamProcessor implements AsyncIterable<string> {
   }
 }
 
+/**
+ * Processes server-sent event data into a string AsyncIterable.
+ *
+ * @example
+ * ```typescript
+ * const eventSource = new EventSource('/api/events');
+ * const processor = new EventSourceProcessor(eventSource);
+ *
+ * for await (const chunk of processor) {
+ *   console.log('Received event data:', chunk);
+ * }
+ * ```
+ */
 export class EventSourceProcessor implements AsyncIterable<string> {
   private eventSource: EventSource;
   private abortController = new AbortController();
   private resolvePromise: (value: string | null) => void;
   private rejectPromise: (error: Error) => void;
 
+  /**
+   * Creates a new EventSourceProcessor.
+   * @param eventSource The EventSource to process
+   */
   constructor(eventSource: EventSource) {
     this.eventSource = eventSource;
 
@@ -79,11 +132,20 @@ export class EventSourceProcessor implements AsyncIterable<string> {
     };
   }
 
+  /**
+   * Aborts the processing operation, and closes the underlying connection.
+   */
   stop(): void {
     this.abortController.abort();
     this.eventSource.close();
   }
 
+  /**
+   * Yields strings from server-sent events until the EventSource is closed, or
+   * the processor is aborted.
+   *
+   * @yields String data from each server-sent event
+   */
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     try {
       while (
@@ -108,6 +170,20 @@ export class EventSourceProcessor implements AsyncIterable<string> {
   }
 }
 
+/**
+ * Processes string, Uint8Array, or ArrayBuffer data from a WebSocket into a
+ * string AsyncIterable.
+ *
+ * @example
+ * ```typescript
+ * const ws = new WebSocket('ws://localhost:8080/stream');
+ * const processor = new WebSocketProcessor(ws);
+ *
+ * for await (const chunk of processor) {
+ *   console.log('Received WebSocket message:', chunk);
+ * }
+ * ```
+ */
 export class WebSocketProcessor implements AsyncIterable<string> {
   private webSocket: WebSocket;
   private decoder = new TextDecoder();
@@ -115,6 +191,10 @@ export class WebSocketProcessor implements AsyncIterable<string> {
   private resolvePromise: (value: string | null) => void;
   private rejectPromise: (error: Error) => void;
 
+  /**
+   * Creates a new WebSocketProcessor.
+   * @param webSocket The WebSocket to process
+   */
   constructor(webSocket: WebSocket) {
     this.webSocket = webSocket;
 
@@ -130,11 +210,21 @@ export class WebSocketProcessor implements AsyncIterable<string> {
     };
   }
 
+  /**
+   * Aborts the processing operation, and closes the connection.
+   */
   stop(): void {
     this.abortController.abort();
     this.webSocket.close();
   }
 
+  /**
+   * Yields string data from WebSocket messages until the connection is closed,
+   * or the processor is aborted. Resolves promises on WebSocket events to avoid
+   * polling.
+   *
+   * @yields String data from each WebSocket message
+   */
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     this.webSocket.onmessage = (event: MessageEvent) => {
       try {
@@ -180,6 +270,14 @@ export class WebSocketProcessor implements AsyncIterable<string> {
     }
   }
 
+  /**
+   * Decodes ArrayBuffer/TypedArray message into a string using TextDecoder.
+   *
+   * @param value The message to decode
+   * @returns The decoded string
+   * @throws Error if the message type is unsupported
+   * @private
+   */
   private decodeChunk(value: string | ArrayBuffer): string {
     if (typeof value === "string") {
       return value;
@@ -194,19 +292,48 @@ export class WebSocketProcessor implements AsyncIterable<string> {
   }
 }
 
+/**
+ * Processes string, Uint8Array, or ArrayBuffer data from an AsyncIterable
+ * into a string AsyncIterable.
+ *
+ * @example
+ * ```typescript
+ * async function* dataGenerator() {
+ *   yield '{"chunk": 1}';
+ *   yield '{"chunk": 2}';
+ * }
+ *
+ * const processor = new AsyncIterableProcessor(dataGenerator());
+ * for await (const chunk of processor) {
+ *   console.log('Processed chunk:', chunk);
+ * }
+ * ```
+ */
 export class AsyncIterableProcessor implements AsyncIterable<string> {
   private asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>;
   private abortController = new AbortController();
   private decoder = new TextDecoder();
 
+  /**
+   * Creates a new AsyncIterableProcessor.
+   * @param asyncIterable - The AsyncIterable to process.
+   */
   constructor(asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>) {
     this.asyncIterable = asyncIterable;
   }
 
+  /**
+   * Aborts processing operation.
+   */
   stop(): void {
     this.abortController.abort();
   }
 
+  /**
+   * Yields strings from the AsyncIterable until it is exhausted, or aborted.
+   *
+   * @yields String chunks decoded from the AsyncIterable
+   */
   async *[Symbol.asyncIterator](): AsyncGenerator<string> {
     for await (const chunk of this.asyncIterable) {
       if (this.abortController.signal.aborted) {
@@ -217,6 +344,14 @@ export class AsyncIterableProcessor implements AsyncIterable<string> {
     }
   }
 
+  /**
+   * Decodes ArrayBuffer/TypedArray data into a string using TextDecoder.
+   *
+   * @param value The data to decode
+   * @returns The decoded string
+   * @throws Error if the data type is unsupported
+   * @private
+   */
   private decodeChunk(value: unknown): string {
     if (typeof value === "string") {
       return value;
@@ -231,30 +366,106 @@ export class AsyncIterableProcessor implements AsyncIterable<string> {
   }
 }
 
+/**
+ * Factory class for creating appropriate stream processors based on input type.
+ * Automatically detects the input type and returns the appropriate processor.
+ *
+ * Provides a unified interface for creating stream processors that can handle
+ * ReadableStream, EventSource, WebSocket, and AsyncIterable streams.
+ *
+ * @example
+ * ```typescript
+ * // Works with different stream types
+ * const fetchProcessor = StreamProcessorFactory.create(response.body);
+ * const wsProcessor = StreamProcessorFactory.create(webSocket);
+ * const sseProcessor = StreamProcessorFactory.create(eventSource);
+ *
+ * // All provide the same AsyncIterable<string> interface
+ * for await (const chunk of fetchProcessor) {
+ *   // Process JSON chunk
+ * }
+ * ```
+ */
 // biome-ignore lint/complexity/noStaticOnlyClass: allow
 export class StreamProcessorFactory {
+  /**
+   * Creates a processor for ReadableStream instances.
+   *
+   * @param stream The ReadableStream to process
+   * @returns AsyncIterable that yields strings from ReadableStream chunks
+   * @private
+   */
   private static forReadableStream(
     stream: ReadableStream,
   ): AsyncIterable<string> {
     return new ReadableStreamProcessor(stream);
   }
 
+  /**
+   * Creates a processor for EventSource instances.
+   *
+   * @param eventSource The EventSource to process
+   * @returns AsyncIterable that yields strings from server-sent events
+   * @private
+   */
   private static forEventSource(
     eventSource: EventSource,
   ): AsyncIterable<string> {
     return new EventSourceProcessor(eventSource);
   }
 
+  /**
+   * Creates a processor for WebSocket instances.
+   *
+   * @param webSocket The WebSocket to process
+   * @returns AsyncIterable that yields strings chunks from WebSocket messages
+   * @private
+   */
   private static forWebSocket(webSocket: WebSocket): AsyncIterable<string> {
     return new WebSocketProcessor(webSocket);
   }
 
+  /**
+   * Creates a processor for AsyncIterables.
+   *
+   * @param asyncIterable The AsyncIterable to process
+   * @returns AsyncIterable that yields strings from AsyncIterable data
+   * @private
+   */
   private static forAsyncIterable(
     asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
   ): AsyncIterable<string> {
     return new AsyncIterableProcessor(asyncIterable);
   }
 
+  /**
+   * Instantiates the appropriate stream processor for the given input type.
+   *
+   * Supported input types:
+   * - ReadableStream
+   * - EventSource
+   * - WebSocket
+   * - AsyncIterable
+   *
+   * @param stream The stream source to process
+   * @returns AsyncIterable that yields strings
+   * @throws Error if the stream is null/undefined or of an unsupported type
+   *
+   * @example
+   * ```typescript
+   * // Fetch API response
+   * const response = await fetch('/api/stream');
+   * const processor = StreamProcessorFactory.create(response.body);
+   *
+   * // Server-sent events
+   * const sse = new EventSource('/api/events');
+   * const sseProcessor = StreamProcessorFactory.create(sse);
+   *
+   * // WebSocket
+   * const ws = new WebSocket('ws://localhost:8080');
+   * const wsProcessor = StreamProcessorFactory.create(ws);
+   * ```
+   */
   static create(
     stream:
       | ReadableStream

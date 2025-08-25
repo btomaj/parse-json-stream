@@ -1,6 +1,30 @@
 import { JSONSymbol, JSONValue } from "~/lib/domain/lexer";
-import { DPDATransition } from "~/lib/domain/parser";
-
+import { DPDATransition } from "~/lib/domain/parser"; /**
+ * Represents a JSON transition in the lexers Finite State Machine, and parsers
+ * Deterministic Pushdown Automaton.
+ *
+ * A JSONTransition defines how the JSON parser moves between states, and track
+ * nested structures like objects and arrays, when encountering JSON symbols.
+ *
+ * Each transition specifies:
+ * - The parser state
+ * - The input symbol that triggers the transition
+ * - The top stack element (that is popped off the stack in the transiton)
+ * - The next parser state after transition
+ * - The the stack element(s) to push onto the stack
+ *
+ * @example
+ * ```typescript
+ * // Transition for opening an object
+ * new JSONTransition(
+ *   JSONValue.None,        // Current state: waiting for a value
+ *   JSONSymbol.LBrace,     // Input symbol: {
+ *   JSONValue.None,        // Stack top: no nesting
+ *   JSONValue.None,        // Next state: still waiting for value (key)
+ *   [JSONValue.None, JSONValue.Object] // Push: enter object
+ * );
+ * ```
+ */
 export class JSONTransition extends DPDATransition<
   JSONValue,
   JSONSymbol,

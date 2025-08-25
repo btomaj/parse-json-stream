@@ -44,15 +44,45 @@ export const JSONSymbol = {
 } as const;
 export type JSONSymbol = (typeof JSONSymbol)[keyof typeof JSONSymbol];
 
-export interface LexerToken<State, Input> {
-  type: State[keyof State];
+/**
+ * Represents a token produced by the lexer during parsing.
+ *
+ * A token contains information about a lexical unit found in the input,
+ * including its type, position within the buffer, and the buffer content itself.
+ *
+ * @template Type The type of value (string, number, etc.)
+ * @template Input The input symbol ({, [, \, etc.)
+ */
+export interface LexerToken<Type, Input> {
+  /** The token type (state) that this token represents */
+  type: Type[keyof Type];
+  /** 0-based starting position of the token in the buffer (inclusive) */
   start: number;
+  /** 0-based ending position of the token in the buffer (exclusive) */
   end: number;
+  /** The string buffer containing the token data */
   buffer: string;
+  /** Input symbol represented by this token [Optional] */
   symbol?: Input[keyof Input];
 }
 
+/**
+ * Represents a transition in a Finite State Machine.
+ *
+ * A transition defines how the machine moves from one state to another
+ * when a specific input symbol is encountered.
+ *
+ * @template State The before and after states
+ * @template Input The input symbol
+ */
 export class FSMTransition<State, Input> {
+  /**
+   * Creates a new FSM transition.
+   *
+   * @param currentState The state the machine must be in for this transition to apply
+   * @param inputSymbol The input symbol that triggers this transition
+   * @param nextState The state that the state machine will move to after the transition
+   */
   constructor(
     public readonly currentState: State,
     public readonly inputSymbol: Input,
@@ -60,6 +90,15 @@ export class FSMTransition<State, Input> {
   ) {}
 }
 
+/**
+ * Abstract base class for Finite State Machines.
+ *
+ * Provides the core functionality for state management and transitions.
+ * Concrete implementations define specific transition tables and behavior.
+ *
+ * @template State Possible states
+ * @template Input Possible input symbols
+ */
 export abstract class FSM<
   State extends Record<string, string | number | symbol>,
   Input extends Record<string, string | symbol>,
@@ -73,6 +112,12 @@ export abstract class FSM<
     >
   > = new Map();
 
+  /**
+   * Creates a new Finite State Machine.
+   *
+   * @param transitions Array of all possible transitions for this FSM
+   * @param initialState The initial state of the machine
+   */
   constructor(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     initialState: State[keyof State],
@@ -89,10 +134,22 @@ export abstract class FSM<
     this._state = initialState;
   }
 
+  /**
+   * Gets the current state of the finite state machine.
+   *
+   * @returns The current state value
+   */
   get state(): State[keyof State] {
     return this._state;
   }
 
+  /**
+   * Performs a state transition based on an input symbol.
+   *
+   * @param inputSymbol The input symbol that triggers the transition
+   * @returns The transition that was executed
+   * @throws Error if no valid transition exists for the current state and input symbol
+   */
   transition(
     inputSymbol: Input[keyof Input],
   ): FSMTransition<State[keyof State], Input[keyof Input]> {
@@ -106,11 +163,27 @@ export abstract class FSM<
     return transition;
   }
 
+  /**
+   * Resets the machine to a specific state.
+   *
+   * @param state The state to reset to
+   */
   reset(state: State[keyof State]) {
     this._state = state;
   }
 }
 
+/**
+ * Abstract base class for lexical analyzers (tokenisers).
+ *
+ * Provides efficient character-by-character tokenisation using precomputed
+ * bitmasks for fast symbol lookup. Concrete implementations define how to
+ * tokenise specific input into meaningful tokens.
+ *
+ * @extends FSM
+ * @template State Possible lexer states
+ * @template Input Possible input symbols
+ */
 export abstract class Lexer<
   State extends Record<string, string | number | symbol>,
   Input extends Record<string, string | symbol>,
@@ -128,6 +201,12 @@ export abstract class Lexer<
    */
   private readonly unicodeCharacterMap: Array<Input[keyof Input]> = [];
 
+  /**
+   * Creates a lexical analyzer.
+   *
+   * @param transitions Array of FSM transitions defining the lexer behavior
+   * @param initialState The initial state of the lexer
+   */
   constructor(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     initialState: State[keyof State],
@@ -142,6 +221,17 @@ export abstract class Lexer<
     this.unicodeCharacterMap = this.createUnicodeCharacterMap(transitions);
   }
 
+  /**
+   * Creates bitmasks for each state to enable fast transition lookups.
+   *
+   * Each state gets a unique bit position, allowing for efficient bitwise
+   * operations when determining valid transitions.
+   *
+   * @param transitions The FSM transitions to analyze
+   * @returns Record mapping each state to its bitmask value
+   * @throws Error if more than 32 states are defined (JavaScript bitwise limitation)
+   * @private
+   */
   private createStateBitmasks(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
   ): Record<State[keyof State], number> {
@@ -169,6 +259,19 @@ export abstract class Lexer<
     return stateBitmasks;
   }
 
+  /**
+   * Creates a lookup table mapping ASCII characters to state bitmasks.
+   *
+   * For each ASCII character (0-127), stores a bitmask indicating which states
+   * have transitions triggered by that character. This enables O(1) lookup
+   * of valid transitions during tokenization.
+   *
+   * @param transitions The FSM transitions to analyze
+   * @param bitmasks State bitmasks created by createStateBitmasks
+   * @returns Typed array indexed by ASCII code, containing state bitmasks
+   * @throws Error if non-ASCII characters are encountered
+   * @private
+   */
   private createLexicalRuleFlags(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
     bitmasks: Record<State[keyof State], number>,
@@ -208,6 +311,14 @@ export abstract class Lexer<
     return bitmaskArray;
   }
 
+  /**
+   * Creates a lookup table mapping ASCII characters to their corresponding input symbols.
+   *
+   * @param transitions The FSM transitions to analyze
+   * @returns Array indexed by ASCII code, containing the corresponding input symbol
+   * @throws Error if non-ASCII characters are encountered
+   * @private
+   */
   private createUnicodeCharacterMap(
     transitions: Array<FSMTransition<State[keyof State], Input[keyof Input]>>,
   ): Array<Input[keyof Input]> {
@@ -232,6 +343,18 @@ export abstract class Lexer<
     return characterMap;
   }
 
+  /**
+   * Utility method simplifying the conversion of strings and Symbols
+   * representing lexical rules into input symbols used by the lexer. It applies
+   * a provided processor function to each character in the string or Symbol
+   * description.
+   *
+   * @template Input The input symbol type
+   * @param lexicalRule The string or Symbol representing a lexical rule to process
+   * @param processor Function called to convert each character into a lexical rule
+   * @throws Error if Symbol lacks description
+   * @protected
+   */
   protected static processLexicalRuleCharacters<
     Input extends Record<string, string | number | symbol>,
   >(lexicalRule: Input[keyof Input], processor: (character: string) => void) {
@@ -253,9 +376,16 @@ export abstract class Lexer<
 
   /**
    * Finds the first symbol with a transition for the current state.
-   * @param chunk The chunk to search.
-   * @param startIndex The starting index for the search.
-   * @returns A tuple containing the index of the first symbol and the symbol itself.
+   *
+   * Uses precomputed bitmasks for O(1) lookup per character, making this operation
+   * highly efficient even for large chunks.
+   *
+   * @param chunk The string chunk to search
+   * @param startIndex The starting index for the search (default: 0)
+   * @returns Tuple of [index, symbol] where index is the position of the symbol,
+   *          and symbol is the input symbol itself.
+   *          Returns [-1, null] if no valid transition is found.
+   * @protected
    */
   protected findFirstTransitionSymbol(
     chunk: string,
@@ -274,15 +404,34 @@ export abstract class Lexer<
   }
 
   /**
-   * Interprets a chunk, and yields `LexerToken`s
+   * Tokenises a chunk of input text into lexical tokens.
    *
-   * Use `findFirstTransitionSymbol` to find token boundary characters from the
-   * transitions, and tokenise the chunk into lexemes.
-   * @param {string} chunk A chunk to interpret.
+   * This abstract method must be implemented by concrete lexers to define
+   * how input chunks are broken down into meaningful tokens. Uses
+   * {@link findFirstTransitionSymbol} to locate token boundaries efficiently.
+   *
+   * @param chunk A chunk of input text to tokenize
+   * @returns Generator yielding {@link LexerToken} objects for each identified token
+   * @abstract
    */
   abstract tokenise(chunk: string): Generator<LexerToken<State, Input>>;
 }
 
+/**
+ * Concrete lexical analyser for JSON text.
+ *
+ * Tokenises JSON input into meaningful lexical units, handling all JSON
+ * syntax including strings with escape sequences, numbers, literals, and
+ * structural elements. Optimized for streaming input with efficient
+ * escape sequence processing across chunk boundaries.
+ *
+ * @example
+ * ```typescript
+ * const lexer = new JSONLexer(transitions, JSONValue.None);
+ * const tokens = [...lexer.tokenise('{"name": "John"}')];
+ * // Produces tokens for: {, "name", :, "John", }
+ * ```
+ */
 export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
   private static readonly symbolLexemes = new Uint8Array(128);
 
@@ -306,16 +455,27 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
   }
 
   /**
-   * Buffers escape characters across chunks.
+   * Buffers escape characters across chunk boundaries.
+   *
+   * Escape sequences (especially Unicode \uXXXX) can span multiple
+   * input chunks, so this buffer accumulates characters until a complete
+   * escape sequence is available for processing.
+   *
+   * Maximum size is 6 bytes to handle Unicode escapes: \uXXXX
    *
    * Used by {@link processEscapeCharacter}.
+   * @private
    */
   private readonly escapeBuffer = new Uint8Array(6);
 
   /**
-   * Tracks escape character buffer across chunks.
+   * Tracks the current length of data in the escape buffer.
+   *
+   * Reset to 0 when a complete escape sequence is processed or
+   * when an invalid sequence is encountered.
    *
    * Used by {@link processEscapeCharacter}.
+   * @private
    */
   private escapeBufferLength = 0;
 
@@ -333,10 +493,21 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
   }
 
   /**
+   * Processes escape sequences in JSON strings, handling multi-chunk sequences.
    *
-   * @param chunk
-   * @param position The 0-based character index of the escape character in the chunk.
-   * @returns {[position: number, escapeSequence: string | null]} The first tuple element is the 0-based character index of the last character in the escape sequence. The second tuple element is the escape sequence, if complete, or null.
+   * Supports all JSON escape sequences including:
+   * - Simple escapes: \", \\, \/, \b, \f, \n, \r, \t
+   * - Unicode escapes: \uXXXX (4 hex digits)
+   *
+   * Can handle escape sequences that span multiple input chunks by buffering
+   * partial sequences until complete.
+   *
+   * @param chunk The input chunk containing the whole, or part, of the escape sequence
+   * @param position The 0-based character index of the escape character encountered in the chunk
+   * @returns Tuple of [position, escapeSequence] where:
+   *          - position: next position to continue processing
+   *          - escapeSequence: decoded character if complete, null if incomplete/invalid
+   * @private
    */
   private processEscapeCharacter(
     chunk: string,
@@ -399,6 +570,23 @@ export class JSONLexer extends Lexer<typeof JSONValue, typeof JSONSymbol> {
     return [position, result];
   }
 
+  /**
+   * Tokenizes a chunk of JSON input into lexical tokens.
+   *
+   * Processes the input character by character, identifying JSON structural
+   * elements (braces, brackets, etc.), and value boundaries. Handles escape
+   * sequences in strings and maintains state across chunk boundaries for
+   * streaming input.
+   *
+   * Key behaviors:
+   * - Skips whitespace when not inside a value
+   * - Processes escape sequences (including multi-chunk sequences)
+   * - Emits tokens for structural elements immediately
+   * - Emits tokens for the whole, or part, of values available in chunk until value boundaries are reached
+   *
+   * @param chunk A chunk of JSON text to tokenise
+   * @yields LexerToken objects representing lexical units
+   */
   public *tokenise(
     chunk: string,
   ): Generator<LexerToken<typeof JSONValue, typeof JSONSymbol>> {
