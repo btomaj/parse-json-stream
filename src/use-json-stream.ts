@@ -103,9 +103,6 @@ export function useJSONStream(
           signal: parseController.signal,
         });
         for await (const chunk of json) {
-          if (parseController.signal.aborted) {
-            break;
-          }
           chunkBufferRef.current.push(chunk);
           scheduleBufferProcessor();
         }
