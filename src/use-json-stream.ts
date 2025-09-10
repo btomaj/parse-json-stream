@@ -48,6 +48,31 @@ export function useJSONStream(
     [bufferProcessor],
   );
 
+  /**
+   * Fetches and streams JSON data from the specified URL.
+   *
+   * Automatically cancels any previous streaming requests before starting a new one.
+   * JSON chunks are buffered and processed on animation frames for optimal performance.
+   *
+   * @example Basic usage
+   * ```typescript
+   * await fetchJSONStream('/api/data');
+   * ````
+   *
+   * @example With custom options
+   * ```typescript
+   * await fetchJSONStream('/api/chat', {
+   *   method: 'POST',
+   *   headers: { 'Content-Type': 'application/json' },
+   *   body: JSON.stringify({ message: 'Hello' })
+   * });
+   * ```
+
+   * @param url The URL from which to fetch JSON data
+   * @param [options] Standard fetch options, except 'signal'
+   * @throws {Error} When the fetch request fails or response is invalid
+   * @returns Promise that resolves when streaming is complete or rejects on error
+   */
   const fetchJSONStream = useCallback(
     async function fetchJSONStream(url: string, options = {}): Promise<void> {
       // abort past fetch and parse, if any
