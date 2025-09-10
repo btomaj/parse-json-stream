@@ -219,3 +219,30 @@ describe.for([
   it.skip("for chunk variation #%$ from WebSocket");
   it.skip("for chunk variation #%$ from EventSource");
 });
+
+it("parseStream with AbortSignal should abort parsing when AbortSignal is triggered", async () => {
+  // Arrange
+  const controller = new AbortController();
+  async function* asyncIterable() {
+    const json = '{"field1": "value1", "field2": "value2"}';
+    for (let i = 0; i < json.length; i += 20) {
+      if (i === 20) {
+        controller.abort();
+      }
+      yield json.slice(i, i + 20);
+    }
+  }
+
+  // Act
+  const jsonChunks = parseStream(asyncIterable(), {
+    signal: controller.signal,
+  });
+  const receivedChunks = [];
+  for await (const chunk of jsonChunks) {
+    receivedChunks.push(chunk);
+  }
+
+  // Assert
+  expect(receivedChunks.length).toEqual(1);
+  expect(controller.signal.aborted).toBe(true);
+});

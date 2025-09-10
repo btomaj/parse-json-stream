@@ -10,13 +10,23 @@ export async function* parseStream(
     | EventSource
     | WebSocket
     | AsyncIterable<string | Uint8Array | ArrayBuffer>,
+  init?: {
+    signal?: AbortSignal;
+  },
 ): AsyncGenerator<JSONChunk> {
   const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
   const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
     JSONValue.None,
   ]);
 
-  for await (const chunk of StreamProcessorFactory.create(stream)) {
+  const processor = StreamProcessorFactory.create(stream);
+  for await (const chunk of processor) {
+    if (init?.signal?.aborted) {
+      processor.stop();
+      return;
+    }
     yield* parser.parse(chunk);
   }
 }
+
+export type { JSONChunk };

@@ -211,7 +211,7 @@ export class WebSocketProcessor implements AsyncIterable<string> {
   }
 
   /**
-   * Aborts the processing operation, and closes the connection.
+   * Aborts the processing operation, and closes the underlying connection.
    */
   stop(): void {
     this.abortController.abort();
@@ -323,7 +323,7 @@ export class AsyncIterableProcessor implements AsyncIterable<string> {
   }
 
   /**
-   * Aborts processing operation.
+   * Aborts the processing operation.
    */
   stop(): void {
     this.abortController.abort();
@@ -366,6 +366,13 @@ export class AsyncIterableProcessor implements AsyncIterable<string> {
   }
 }
 
+interface StreamProcessor extends AsyncIterable<string> {
+  /**
+   * Aborts the processing operation, and closes the underlying connection.
+   */
+  stop(): void;
+}
+
 /**
  * Factory class for creating appropriate stream processors based on input type.
  * Automatically detects the input type and returns the appropriate processor.
@@ -395,9 +402,7 @@ export class StreamProcessorFactory {
    * @returns AsyncIterable that yields strings from ReadableStream chunks
    * @private
    */
-  private static forReadableStream(
-    stream: ReadableStream,
-  ): AsyncIterable<string> {
+  private static forReadableStream(stream: ReadableStream): StreamProcessor {
     return new ReadableStreamProcessor(stream);
   }
 
@@ -408,9 +413,7 @@ export class StreamProcessorFactory {
    * @returns AsyncIterable that yields strings from server-sent events
    * @private
    */
-  private static forEventSource(
-    eventSource: EventSource,
-  ): AsyncIterable<string> {
+  private static forEventSource(eventSource: EventSource): StreamProcessor {
     return new EventSourceProcessor(eventSource);
   }
 
@@ -421,7 +424,7 @@ export class StreamProcessorFactory {
    * @returns AsyncIterable that yields strings chunks from WebSocket messages
    * @private
    */
-  private static forWebSocket(webSocket: WebSocket): AsyncIterable<string> {
+  private static forWebSocket(webSocket: WebSocket): StreamProcessor {
     return new WebSocketProcessor(webSocket);
   }
 
@@ -434,7 +437,7 @@ export class StreamProcessorFactory {
    */
   private static forAsyncIterable(
     asyncIterable: AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): AsyncIterable<string> {
+  ): StreamProcessor {
     return new AsyncIterableProcessor(asyncIterable);
   }
 
@@ -472,7 +475,7 @@ export class StreamProcessorFactory {
       | EventSource
       | WebSocket
       | AsyncIterable<string | Uint8Array | ArrayBuffer>,
-  ): AsyncIterable<string> {
+  ): StreamProcessor {
     if (typeof stream === "undefined" || stream === null) {
       throw new Error("Stream is undefined or null");
     }

@@ -47,6 +47,28 @@ for await (const chunk of JSON.parseStream(stream)) {
 }
 ```
 
+The `useJSONStream` hook is available for React applications using [fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
+
+```typescript
+import { useJSONStream } from 'parse-json-stream/react';
+
+function MyComponent() {
+  const [data, setData] = useState<MyData | null>(null);
+
+  const { fetchJSONStream } = useJSONStream((jsonChunks) => {
+    for (const chunk in jsonChunks) {
+      setData(value => value + chunk.value);
+    }
+  });
+
+  useEffect(() => {
+    fetchJSONStream('/api/data');
+  }, [fetchJSONStream]);
+
+  return <div>{data}</div>;
+}
+```
+
 
 ## Why another JSON parsing library?
 
@@ -217,6 +239,9 @@ try {
   console.error('JSON parsing error:', error);
 }
 ```
+
+### Testing useJSONStream
+For performance, useJSONStream synchronises callbacks to the provided JSON processing function with animation frames. When testing the processor function passed to useJSONStream, some test environments require that timers are advanced manually for animation frames. Check the documentation on timers for your chosen testing framework.
 
 ### Path Filtering
 ```typescript
