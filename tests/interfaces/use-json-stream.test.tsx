@@ -107,7 +107,9 @@ it("should fetch, buffer, and process JSON stream chunks", async () => {
     ]);
   });
 
-  expect(mockParseStream).toHaveBeenCalledWith(expect.any(ReadableStream));
+  expect(mockParseStream).toHaveBeenCalledWith(expect.any(ReadableStream), {
+    signal: expect.any(AbortSignal),
+  });
   expect(mockRequestAnimationFrame).toHaveBeenCalled();
 });
 
