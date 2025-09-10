@@ -47,6 +47,28 @@ for await (const chunk of JSON.parseStream(stream)) {
 }
 ```
 
+The `useJSONStream` hook is available for React applications using [fetch](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API):
+
+```typescript
+import { useJSONStream } from 'parse-json-stream/react';
+
+function MyComponent() {
+  const [data, setData] = useState<MyData | null>(null);
+
+  const { fetchJSONStream } = useJSONStream((jsonChunks) => {
+    for (const chunk in jsonChunks) {
+      setData(value => value + chunk.value);
+    }
+  });
+
+  useEffect(() => {
+    fetchJSONStream('/api/data');
+  }, [fetchJSONStream]);
+
+  return <div>{data}</div>;
+}
+```
+
 
 ## Why another JSON parsing library?
 
