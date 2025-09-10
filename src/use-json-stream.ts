@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { type JSONChunk, parseStream } from "~/index";
+import { parseStream } from "~/index";
+import type { JSONChunk } from "~/lib/domain/chunk";
 
 /**
  * React hook for fetching and parsing a JSON stream.
@@ -136,3 +137,5 @@ export function useJSONStream(
 
   return { fetchJSONStream };
 }
+
+export type { JSONChunk };
