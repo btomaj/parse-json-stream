@@ -240,6 +240,9 @@ try {
 }
 ```
 
+### Testing useJSONStream
+For performance, useJSONStream synchronises callbacks to the provided JSON processing function with animation frames. When testing the processor function passed to useJSONStream, some test environments require that timers are advanced manually for animation frames. Check the documentation on timers for your chosen testing framework.
+
 ### Path Filtering
 ```typescript
 // Only process specific paths

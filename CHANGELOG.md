@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.1.0] - 2025-09-10
 
 ### Added
+- Can use AbortSignal to terminate `parseStream` and `useJSONStream`
+- CI and CD through GitHub Actions
+
+### Features
 - `useJSONStream` React hook for easy integration with React applications.
 - New export path `/react` for the React hook.
 
