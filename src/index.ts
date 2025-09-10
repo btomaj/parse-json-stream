@@ -28,3 +28,5 @@ export async function* parseStream(
     yield* parser.parse(chunk);
   }
 }
+
+export type { JSONChunk };
