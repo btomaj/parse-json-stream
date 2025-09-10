@@ -90,8 +90,8 @@ export function useJSONStream(
 
       try {
         const response = await fetch(url, {
-          signal: fetchController.signal,
           ...options,
+          signal: fetchController.signal,
         });
         if (!response.ok || !response.body) {
           throw new Error(
