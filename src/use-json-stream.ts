@@ -2,11 +2,27 @@ import { useCallback, useEffect, useRef } from "react";
 import { type JSONChunk, parseStream } from "~/index";
 
 /**
- * When catching errors, use either through try...catch blocks with await, or
- * Promise.catch()
+ * React hook for fetching and parsing a JSON stream.
  *
- * @param bufferProcessor
- * @returns
+ * The hook automatically handles request cancellation, optimises performance by
+ * batching chunks using animation frames, and provides automatic cleanup on
+ * component unmount.
+ *
+ * @example
+ * ```typescript
+ * const { fetchJSONStream } = useJSONStream((chunks) => {
+ *   for (const chunk of chunks) {
+ *     setData(data => data + chunk.value);
+ *   }
+ * });
+ *
+ * useEffect(() => {
+ *   fetchJSONStream('/api/json-stream');
+ * }, [fetchJSONStream]);
+ * ```
+ *
+ * @param bufferProcessor Your function to process batches of JSONChunk objects on each animation frame
+ * @returns Object containing fetchJSONStream function for initiating the fetch request
  */
 export function useJSONStream(
   bufferProcessor: (jsonChunks: Array<JSONChunk>) => void,
@@ -22,8 +38,9 @@ export function useJSONStream(
         scheduledAnimationFrameRef.current = requestAnimationFrame(
           function animationFrameCallback() {
             scheduledAnimationFrameRef.current = null;
-            bufferProcessor(chunkBufferRef.current);
-            chunkBufferRef.current = [];
+            const chunks = chunkBufferRef.current;
+            chunkBufferRef.current = []; // clear before bufferProcessor in case bufferProcessor throws
+            bufferProcessor(chunks);
           },
         );
       }
@@ -57,7 +74,9 @@ export function useJSONStream(
           );
         }
 
-        const json = parseStream(response.body);
+        const json = parseStream(response.body, {
+          signal: parseController.signal,
+        });
         for await (const chunk of json) {
           if (parseController.signal.aborted) {
             break;
@@ -89,6 +108,7 @@ export function useJSONStream(
       if (scheduledAnimationFrameRef.current) {
         cancelAnimationFrame(scheduledAnimationFrameRef.current);
       }
+      chunkBufferRef.current = [];
     };
   }, []);
 
