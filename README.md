@@ -12,7 +12,7 @@ High-performance, real-time, JSON stream parser that parses and yields partial v
 - **Strong browser support** - Works with ReadableStream, WebSocket, EventSource, and AsyncIterable
 - **Lightweight and fast** - Optimised to minimise CPU cycles and memory allocation. Zero dependencies.
 
-## Instalation
+## Installation
 
 ```bash
 npm install parse-json-stream
