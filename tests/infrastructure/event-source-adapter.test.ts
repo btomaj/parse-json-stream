@@ -72,7 +72,7 @@ it("should handle messages", async () => {
   expect(messages).toEqual(["1", "", "2"]);
 });
 
-it("should end iteration when EventSource is closed", async () => {
+it("should end iteration when EventSource is CLOSED", async () => {
   // Arrange
   const stubEventSource = new StubEventSource(EventSource.CLOSED);
   const adapter = new EventSourceProcessor(stubEventSource);
@@ -89,21 +89,22 @@ it("should end iteration when EventSource is closed", async () => {
   expect(messages).toEqual([]);
 });
 
-it("should throw error when EventSource is connecting", async () => {
+it("should ignore errors when EventSource is CONNECTING", async () => {
   // Arrange
   const stubEventSource = new StubEventSource(EventSource.CONNECTING);
   const adapter = new EventSourceProcessor(stubEventSource);
 
   // Act
   stubEventSource.dispatchEvent(new Event("error"));
+  setTimeout(() => stubEventSource.close());
   const messages = [];
 
   // Assert
-  await expect(async () => {
-    for await (const message of adapter) {
-      messages.push(message);
-    }
-  }).rejects.toThrow("Server-side event error");
+  for await (const message of adapter) {
+    messages.push(message);
+  }
+
+  expect(messages).toEqual([]);
 });
 
 it("should throw error when EventSource has error", async () => {

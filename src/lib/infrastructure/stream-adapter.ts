@@ -113,10 +113,14 @@ export class EventSourceProcessor implements AsyncIterable<string> {
     };
 
     this.eventSource.onerror = () => {
-      if (this.eventSource.readyState === EventSource.CLOSED) {
-        this.resolvePromise(null); // signal end
-      } else {
-        this.rejectPromise(new Error("Server-side event error"));
+      switch (this.eventSource.readyState) {
+        case EventSource.CLOSED:
+          this.resolvePromise(null); // signal end
+          break;
+        case EventSource.CONNECTING:
+          break;
+        default:
+          this.rejectPromise(new Error("Server-side event error"));
       }
     };
 

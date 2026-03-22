@@ -220,17 +220,13 @@ describe.for([
   it.skip("for chunk variation #%$ from EventSource");
 });
 
-it("parseStream with AbortSignal should abort parsing when AbortSignal is triggered", async () => {
+it("parseStream should not parse stream when AbortSignal is pre-aborted", async () => {
   // Arrange
   const controller = new AbortController();
+  controller.abort();
+
   async function* asyncIterable() {
-    const json = '{"field1": "value1", "field2": "value2"}';
-    for (let i = 0; i < json.length; i += 20) {
-      if (i === 20) {
-        controller.abort();
-      }
-      yield json.slice(i, i + 20);
-    }
+    yield '{"read":"true"}';
   }
 
   // Act
@@ -243,6 +239,28 @@ it("parseStream with AbortSignal should abort parsing when AbortSignal is trigge
   }
 
   // Assert
-  expect(receivedChunks.length).toEqual(1);
+  expect(receivedChunks).toEqual([]);
+});
+
+it("parseStream should abort parsing when AbortSignal is triggered", async () => {
+  // Arrange
+  const controller = new AbortController();
+  async function* asyncIterable() {
+    yield '{"field1": "value1",';
+    controller.abort();
+    yield '"field2": "value2"}';
+  }
+
+  // Act
+  const jsonChunks = parseStream(asyncIterable(), {
+    signal: controller.signal,
+  });
+  const receivedChunks = [];
+  for await (const chunk of jsonChunks) {
+    receivedChunks.push(chunk);
+  }
+
+  // Assert
+  expect(receivedChunks).toHaveLength(1);
   expect(controller.signal.aborted).toBe(true);
 });

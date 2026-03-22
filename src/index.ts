@@ -14,18 +14,28 @@ export async function* parseStream(
     signal?: AbortSignal;
   },
 ): AsyncGenerator<JSONChunk> {
+  if (init?.signal?.aborted) {
+    return;
+  }
+
   const lexer = new JSONLexer(JSONTransitions, JSONValue.None);
   const parser = new JSONParser(lexer, JSONTransitions, JSONValue.None, [
     JSONValue.None,
   ]);
-
   const processor = StreamProcessorFactory.create(stream);
-  for await (const chunk of processor) {
-    if (init?.signal?.aborted) {
-      processor.stop();
-      return;
+
+  const onAbort = () => {
+    processor.stop();
+  };
+
+  init?.signal?.addEventListener("abort", onAbort, { once: true });
+
+  try {
+    for await (const chunk of processor) {
+      yield* parser.parse(chunk);
     }
-    yield* parser.parse(chunk);
+  } finally {
+    init?.signal?.removeEventListener("abort", onAbort);
   }
 }
 
